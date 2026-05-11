@@ -1,0 +1,15 @@
+# 【可选备用】团队日常开发以本机 MySQL 为准，不要求使用本文件。
+# 仅当机器上未安装 MySQL、又需要临时起库时，可在 apps/server 执行：
+#   docker compose -f docker-compose.mysql.yml up -d
+# 此时须设置 DATABASE_URL=mysql://root:Root123..@127.0.0.1:3307/flasenc（宿主映射 3307）。
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: Root123..
+      MYSQL_DATABASE: flasenc
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci

@@ -1,0 +1,25 @@
+---
+description: 注释必填且与实现同步 | Mandatory comments for non-obvious behavior; sync or remove comments when logic changes
+alwaysApply: true
+---
+
+# 注释与逻辑同步（项目硬性提醒）
+
+## MUST
+
+- **注释位置**：对非显而易见的业务分支、边界、契约、副作用编写注释，紧邻相关实现（避免「文档块」与代码脱节）。
+- **逻辑变更**：修改逻辑时须同步更新或删除相关注释；禁止留下与当前实现不符的过时注释。
+- **后端 HTTP 契约（须按 `docs/BACKEND.md` 执行，无需额外口头提醒）**：
+  - **第 4.1 节**：`createZodDto` 绑定的 body/query 中 **每个对外字段** 须有 Zod **`.describe`**（OpenAPI 与校验同源）。
+  - **第 10.1 节**：对外 **`export type …Dto` 等** 须有类型级 + **字段级** `/** */` 注释。
+  - **第 10.2 节**：Controller 对外方法须有 **`@param`** 说明各注入参数。
+
+## 规范依据
+
+- 前端：`docs/FRONTEND.md` 第 1.5 节（注释与逻辑同步）
+- 后端：`docs/BACKEND.md` 第 10 节（含 10.1 / 10.2）、第 4.1 节（入参 `.describe`）
+
+## 适用范围与风格
+
+- 主要适用于编辑 `apps/admin-web`、`apps/mobile`、`apps/server`、`packages/*` 下的源码时。
+- 同一文件内注释语言保持一致（与现有文件风格对齐）。

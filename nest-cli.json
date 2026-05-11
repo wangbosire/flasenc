@@ -1,0 +1,38 @@
+{
+  "monorepo": true,
+  "root": "apps/flasenc",
+  "sourceRoot": "apps/flasenc/src",
+  "compilerOptions": {
+    "webpack": true,
+    "tsConfigPath": "apps/flasenc/tsconfig.app.json"
+  },
+  "projects": {
+    "admin": {
+      "type": "application",
+      "root": "apps/admin",
+      "entryFile": "main",
+      "sourceRoot": "apps/admin/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/admin/tsconfig.app.json"
+      }
+    },
+    "flasenc": {
+      "type": "application",
+      "root": "apps/flasenc",
+      "entryFile": "main",
+      "sourceRoot": "apps/flasenc/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/flasenc/tsconfig.app.json"
+      }
+    },
+    "front": {
+      "type": "application",
+      "root": "apps/front",
+      "entryFile": "main",
+      "sourceRoot": "apps/front/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/front/tsconfig.app.json"
+      }
+    }
+  }
+}

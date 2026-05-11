@@ -1,0 +1,437 @@
+// 内容分享平台（权益兑换）物理模型：与产品规格、技术方案、设计文档对齐；迁移与索引随迭代细化。
+// **users** = 平台账号（管理端）；**member_users** = C 端会员，两表禁止混用同一身份语义。
+// 连接串：环境变量 DATABASE_URL（MySQL）。示例见 apps/server/.env.example；人类可读说明见 docs/design-docs/content-sharing-platform-prisma-schema.md
+
+/// Prisma Client 生成配置；与 `pnpm prisma generate` 及 Nest `DatabaseModule` 引用一致。
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// MySQL 数据源；`url` 不落仓库，仅运行时注入。
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 平台账号（管理端）：与 C 端会员分表
+// ---------------------------------------------------------------------------
+
+/// 平台操作者（`users`）：管理端 JWT 的 `sub`、权益创建人、审计 `actorUserId` 等指向本表。
+model User {
+  /// 主键；与 HTTP API UUID 字符串一致（`Char(36)`）。
+  id        String   @id @default(uuid()) @db.Char(36)
+  /// 登录邮箱；唯一，可为空仅当未来支持非邮箱登录且业务允许（当前管理端以邮箱为主）。
+  email     String?  @unique @db.VarChar(320)
+  /// 管理端登录密码（bcrypt）；未启用密码策略前可空。
+  passwordHash String? @db.VarChar(255)
+  /// 门控：为 `true` 才允许管理端登录与写接口；完整 RBAC 落地后可逐步替换为角色表。
+  platformAdmin Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// 创建的权益记录（可空外键：用户删除后置空）。
+  entitlementsCreated ContentEntitlement[] @relation("EntitlementCreator")
+  /// 以平台用户身份写入的审计行。
+  auditLogsAsActor    AuditLog[]           @relation("AuditActorUser")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// C 端会员（`member_users`）
+// ---------------------------------------------------------------------------
+
+/// C 端会员：JWT `sub`、内容 Owner、兑换人、评论作者、转让双方、通知收件人等均引用本表。
+model MemberUser {
+  id           String    @id @default(uuid()) @db.Char(36)
+  /// 邮箱注册/登录；与平台 `User.email` 无唯一约束关联，业务层禁止混用两表身份。
+  email        String?   @unique @db.VarChar(320)
+  /// bcrypt 摘要；未走密码体系时可为空。
+  passwordHash String?   @db.VarChar(255)
+  /// C 端展示昵称；可空，最长 64（与 `PATCH /auth/me` 校验一致）。
+  displayName  String?   @db.VarChar(64)
+  /// 微信小程序 `login` 返回的 `openid`（与 `WECHAT_MINI_PROGRAM_APPID` 绑定）；纯微信账号可无邮箱。
+  wechatMpOpenId String? @unique @db.VarChar(64)
+  /// 微信 `unionid`（开放平台绑定后）；用于多端同一自然人，可空。
+  wechatUnionId  String? @unique @db.VarChar(64)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ownedContents          Content[]                      @relation("ContentMemberOwner")
+  comments               Comment[]
+  redeemedCodes          RedemptionCode[]               @relation("RedemptionRedeemerMember")
+  transfersFrom          ContentTransfer[]              @relation("TransferFromMember")
+  transfersTo            ContentTransfer[]              @relation("TransferToMember")
+  notificationPreference MemberNotificationPreference?
+  inAppNotifications     InAppNotification[]
+  auditLogsAsActor       AuditLog[]                     @relation("AuditActorMember")
+
+  @@map("member_users")
+}
+
+// ---------------------------------------------------------------------------
+// 权益与兑换码
+// ---------------------------------------------------------------------------
+
+/// 内容与权益 1:1：创建权益时同事务插入占位 `Content`；`contentId` 全局唯一。
+model ContentEntitlement {
+  id              String            @id @default(uuid()) @db.Char(36)
+  /// 绑定的内容主键；删除权益时级联删除内容（与产品「占位随权益」一致）。
+  contentId       String            @unique @db.Char(36)
+  content         Content           @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  /// 平台创建人；用户删除后置空保留审计关联。
+  createdByUserId String?           @db.Char(36)
+  createdBy       User?             @relation("EntitlementCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  /// 权益业务生命周期：归档后是否仍允许发码由应用层约束。
+  status          EntitlementStatus @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  redemptionCodes RedemptionCode[]
+
+  @@index([createdByUserId])
+  @@map("content_entitlements")
+}
+
+/// 权益是否仍对运营可见/可发码（细粒度与产品迭代可对齐）。
+enum EntitlementStatus {
+  /// 正常：可发码、可被兑换（在码有效前提下）。
+  ACTIVE
+  /// 归档：一般不再新发码；已发码是否作废由业务规则决定。
+  ARCHIVED
+}
+
+/// 一条兑换码实例：明文仅存响应一次，库内仅 `codeHash`。
+model RedemptionCode {
+  id                 String               @id @default(uuid()) @db.Char(36)
+  /// 所属权益。
+  entitlementId      String               @db.Char(36)
+  entitlement        ContentEntitlement   @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  /// 明文兑换码的 hash（算法与 `libs/shared` 一致）；唯一约束支撑「一码一用」抢码更新。
+  codeHash           String               @unique @db.VarChar(128)
+  /// 有效 / 作废 / 已兑换；与兑换事务、失败审计配合。
+  status             RedemptionCodeStatus @default(ACTIVE)
+  /// 运营手动作废时间。
+  invalidatedAt      DateTime?
+  /// 兑换成功时间。
+  redeemedAt         DateTime?
+  /// 兑换人（会员）；删除会员后置空保留码行历史。
+  redeemedByMemberId String?              @db.Char(36)
+  redeemedByMember   MemberUser?          @relation("RedemptionRedeemerMember", fields: [redeemedByMemberId], references: [id], onDelete: SetNull)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([entitlementId])
+  @@index([status])
+  @@map("redemption_codes")
+}
+
+/// 兑换码生命周期。
+enum RedemptionCodeStatus {
+  /// 可尝试兑换（仍须通过业务校验）。
+  ACTIVE
+  /// 运营作废，不可再兑。
+  INVALIDATED
+  /// 已成功兑换，不可复用。
+  REDEEMED
+}
+
+// ---------------------------------------------------------------------------
+// 内容正文（无 templateId 外键；与模板分治）
+// ---------------------------------------------------------------------------
+
+/// 用户生成内容：Owner、占位类型、正文 JSON、发布态与上架态正交。
+model Content {
+  id              String                 @id @default(uuid()) @db.Char(36)
+  /// 当前 Owner（会员）；占位未兑前可为空，兑换/转让后更新。
+  ownerMemberId   String?                @db.Char(36)
+  ownerMember     MemberUser?            @relation("ContentMemberOwner", fields: [ownerMemberId], references: [id], onDelete: SetNull)
+  /// 占位与「已进入会员持有流程」等粗粒度区分；可与业务再细分。
+  placeholderKind ContentPlaceholderKind @default(PLACEHOLDER)
+  /// 标题；草稿可空或后续填。
+  title           String?                @db.VarChar(512)
+  /// 正文 JSON 文档模型（块类型等见技术方案）；版本字段可嵌在 JSON 内。
+  body            Json?
+  /// 机审与发布流水线状态（与 `ModerationJob`、Worker 配合）。
+  publishStatus   ContentPublishStatus   @default(DRAFT)
+  /// 与发布态正交：平台下架、紧急隐藏等访客/列表可见性。
+  listingState    ContentListingState    @default(NORMAL)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  entitlement    ContentEntitlement?
+  comments       Comment[]
+  transfers      ContentTransfer[]
+  moderationJobs ModerationJob[]
+
+  @@index([ownerMemberId])
+  @@index([publishStatus, listingState])
+  @@map("contents")
+}
+
+/// 占位内容随权益创建；兑换后进入会员侧持有语义。
+enum ContentPlaceholderKind {
+  PLACEHOLDER
+  OWNED
+}
+
+/// 内容发布与机审粗粒度状态机落点（与产品「机审分支」章节对齐）。
+enum ContentPublishStatus {
+  /// 可编辑未提交。
+  DRAFT
+  /// 已提交待机审或排队中。
+  SUBMITTED
+  /// 机审通过且对外可展示（仍受 `listingState` 约束）。
+  PUBLISHED
+  /// 机审拒绝，Owner 可改后再提。
+  MACHINE_REJECTED
+  /// 疑似：可先对外展示但进运营队列（与产品一致）。
+  SUSPICIOUS_PUBLISHED
+  /// 人工驳回。
+  MANUALLY_REJECTED
+}
+
+/// 平台对「是否公开展示」的干预，与 `publishStatus` 独立组合使用。
+enum ContentListingState {
+  /// 无平台干预时的默认上架展示策略（仍须 `publishStatus` 允许公开）。
+  NORMAL
+  /// 平台无条件下架。
+  PLATFORM_UNLISTED
+  /// 紧急隐藏。
+  EMERGENCY_HIDDEN
+}
+
+// ---------------------------------------------------------------------------
+// 内容模板
+// ---------------------------------------------------------------------------
+
+/// 运营维护的内容模板；**无外键指向 `Content`**，选用模板时由应用层覆盖正文。
+model ContentTemplate {
+  id          String              @id @default(uuid()) @db.Char(36)
+  title       String              @db.VarChar(512)
+  body        Json
+  /// 上架可被选；下架仍保留数据但 C 端列表不可选。
+  shelfStatus TemplateShelfStatus @default(ON_SHELF)
+  /// 软删：有值表示对用户「已删除不可恢复」语义（与产品一致）。
+  deletedAt   DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([shelfStatus, deletedAt])
+  @@map("content_templates")
+}
+
+enum TemplateShelfStatus {
+  /// C 端可选模板列表中出现。
+  ON_SHELF
+  /// 不可选；已选用过的历史内容不受影响。
+  OFF_SHELF
+}
+
+// ---------------------------------------------------------------------------
+// 评论（二层对话串）
+// ---------------------------------------------------------------------------
+
+/// 评论：锚点 + 串内回复；深度恒为 2 的不变量由应用层写入前校验保证。
+model Comment {
+  id               String               @id @default(uuid()) @db.Char(36)
+  contentId        String               @db.Char(36)
+  content          Content              @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  authorMemberId   String               @db.Char(36)
+  authorMember     MemberUser           @relation(fields: [authorMemberId], references: [id], onDelete: Cascade)
+  /// 锚点行：`null`；串内行：等于该串锚点评论的 `id`。
+  anchorId         String?              @db.Char(36)
+  anchor           Comment?             @relation("CommentThread", fields: [anchorId], references: [id], onDelete: Cascade)
+  threadMessages   Comment[]            @relation("CommentThread")
+  /// 串内行：`parentId` 恒等于锚点 `id`；锚点行 `null`。
+  parentId         String?              @db.Char(36)
+  parent           Comment?             @relation("CommentParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children         Comment[]            @relation("CommentParent")
+  /// UI 层「回复谁」；不得单独构成第三层父子（服务端拒绝非法 `parentId`）。
+  replyToCommentId String?              @db.Char(36)
+  body             Json
+  /// 评论侧机审/展示状态（与内容机审概念类似但枚举独立）。
+  publishStatus    CommentPublishStatus @default(PUBLISHED)
+  /// 软删：作者 / Owner / 管理员删除。
+  deletedAt        DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  moderationJobs ModerationJob[]
+
+  @@index([contentId, anchorId, createdAt])
+  @@index([authorMemberId])
+  @@map("comments")
+}
+
+enum CommentPublishStatus {
+  /// 机审队列中（若产品启用评论机审）。
+  PENDING
+  PUBLISHED
+  MACHINE_BLOCKED
+  SUSPICIOUS_PUBLISHED
+  DELETED_BY_MODERATION
+}
+
+// ---------------------------------------------------------------------------
+// 内容转让
+// ---------------------------------------------------------------------------
+
+/// 一次转让流程：发起 →（可选撤销）→ 确认或过期；凭证仅存 hash。
+model ContentTransfer {
+  id            String         @id @default(uuid()) @db.Char(36)
+  contentId     String         @db.Char(36)
+  content       Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  /// 发起时 Owner。
+  fromMemberId  String         @db.Char(36)
+  fromMember      MemberUser   @relation("TransferFromMember", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  /// 确认后填入受让会员；未完成前为空。
+  toMemberId    String?        @db.Char(36)
+  toMember      MemberUser?    @relation("TransferToMember", fields: [toMemberId], references: [id], onDelete: SetNull)
+  /// 卡片分享或转让码两种路径。
+  method        TransferMethod
+  /// `TRANSFER_CODE` 时：码的 hash；与兑换码分前缀 hash（应用层约定）。
+  codeHash      String?        @db.VarChar(128)
+  /// `CARD_SHARE` 时：卡片 token 的 hash。
+  cardTokenHash String?        @db.VarChar(128)
+  /// 状态机：同一内容仅一笔 `PENDING` 由事务 + 索引策略保证。
+  status        TransferStatus @default(PENDING)
+  /// 截止时间：第 7 个自然日 23:59:59（业务时区写入，见技术方案「转让截止」）。
+  expiresAt     DateTime
+  confirmedAt   DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([contentId, status])
+  @@index([fromMemberId])
+  @@map("content_transfers")
+}
+
+enum TransferMethod {
+  /// 短期链接 / token 确认路径。
+  CARD_SHARE
+  /// 明文码仅展示一次，库内存 hash。
+  TRANSFER_CODE
+}
+
+enum TransferStatus {
+  /// 等待受让方确认或过期任务扫描。
+  PENDING
+  /// 已确认：`Content.ownerMemberId` 已更新。
+  CONFIRMED
+  /// 发起方撤销。
+  REVOKED
+  /// 超过 `expiresAt` 或定时任务置位。
+  EXPIRED
+}
+
+// ---------------------------------------------------------------------------
+// 机审任务
+// ---------------------------------------------------------------------------
+
+/// 机审队列中的一条作业：主体可为内容或评论；`provider` 支持 noop / 第三方接入。
+model ModerationJob {
+  id            String                @id @default(uuid()) @db.Char(36)
+  /// 与下方 `contentId` / `commentId` 二选一配套，由写入方保证一致。
+  subjectType   ModerationSubjectType
+  contentId     String?               @db.Char(36)
+  content       Content?              @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  commentId     String?               @db.Char(36)
+  comment       Comment?              @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  /// 接入实现标识；MVP 默认 `noop`。
+  provider      String                @default("noop") @db.VarChar(64)
+  /// 第三方返回的 job id，便于轮询/回调对账。
+  externalJobId String?               @db.VarChar(256)
+  /// Worker 内部状态：入队、执行中、完成、失败。
+  state         ModerationJobState    @default(QUEUED)
+  /// 供应商原始响应或结构化摘要 JSON。
+  resultPayload Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([subjectType, state])
+  @@index([contentId])
+  @@index([commentId])
+  @@map("moderation_jobs")
+}
+
+enum ModerationSubjectType {
+  CONTENT
+  COMMENT
+}
+
+enum ModerationJobState {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// 审计
+// ---------------------------------------------------------------------------
+
+/// 审计流水：`actorUserId` 与 `actorMemberId` 二选一（应用层保证）；豁免场景（如选用模板不写）由业务代码控制。
+model AuditLog {
+  id              String      @id @default(uuid()) @db.Char(36)
+  /// 平台操作者；与 `User` 关联。
+  actorUserId     String?     @db.Char(36)
+  actorUser       User?       @relation("AuditActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  /// 会员操作者；与 `MemberUser` 关联。
+  actorMemberId   String?     @db.Char(36)
+  actorMember     MemberUser? @relation("AuditActorMember", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  /// 与代码内 `AuditAction` 常量对齐的短字符串。
+  action          String      @db.VarChar(128)
+  /// 被操作对象类型（多态第一层）。
+  targetType      String      @db.VarChar(64)
+  /// 被操作对象 id 或稳定业务键（多态第二层）。
+  targetId        String      @db.VarChar(64)
+  /// 前后快照、原因码等 JSON；体积需控制以免表膨胀过快。
+  payload         Json?
+  /// 与请求 `X-Request-Id` / 成功信封 `traceId` 对齐，便于排障串联。
+  traceId         String?     @db.VarChar(64)
+  createdAt       DateTime    @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([actorMemberId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// 通知
+// ---------------------------------------------------------------------------
+
+/// 会员通知渠道开关；与 `MemberUser` 1:1。
+model MemberNotificationPreference {
+  memberId           String     @id @db.Char(36)
+  member             MemberUser @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// 是否写入站内信表；为 `false` 时业务层跳过插入 `InAppNotification`。
+  channelInApp       Boolean    @default(true)
+  /// 是否生成/尝试小程序订阅消息（具体发送由平台 SDK 与后端任务配合）。
+  channelMiniProgram Boolean    @default(false)
+  updatedAt          DateTime   @updatedAt
+
+  @@map("member_notification_preferences")
+}
+
+/// 站内信 MVP：收件箱一行一条；`readAt` 为空表示未读。
+model InAppNotification {
+  id        String     @id @default(uuid()) @db.Char(36)
+  memberId  String     @db.Char(36)
+  member    MemberUser @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// 业务分类，便于前端分栏或埋点。
+  category  String     @db.VarChar(64)
+  title     String     @db.VarChar(256)
+  body      String     @db.VarChar(2048)
+  /// 结构化附加字段（如 `contentId`），可选。
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([memberId, readAt, createdAt])
+  @@map("in_app_notifications")
+}

@@ -1,0 +1,8 @@
+# CODEOWNERS — 取消注释并替换为团队 GitHub 用户名或 @org/team
+# 语法: 路径模式 @owner
+# 文档: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# apps/mobile/       @your-org/mobile-reviewers
+# apps/admin-web/    @your-org/web-reviewers
+# apps/server/       @your-org/backend-reviewers
+# packages/ui/       @your-org/web-reviewers
