@@ -25,6 +25,16 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+### 本仓库：数据库与本地环境
+
+- **本地开发与 E2E**：使用 **本机 MySQL**，**不依赖 Docker**。在 `apps/server` 复制 **`.env.example`** 为 **`.env`**，将 **`DATABASE_URL`** 改为你的账号、口令、端口（库名建议 **`flasenc`**）。
+- **首次建库**（若尚无 `flasenc` 库）：在本机执行
+  `mysql -u root -p < scripts/create-flasenc-database.sql`
+  （把 `root` 换成你的管理账号亦可；需具备 `CREATE DATABASE` 权限。）
+- **首次建表**：在同一目录执行 **`pnpm run db:migrate:deploy`**（应用 `libs/database/prisma/migrations/*`）。须保证 **`.env` 中 `DATABASE_URL` 正确**，否则会报 `P1000` 认证失败。
+- **本地管理账号**：执行 **`pnpm run db:seed:admin`** 会创建或更新 `admin@example.com`，默认密码 `admin123..`，并设置 `platformAdmin=true`。如需覆盖默认值，可在命令前设置 `FLASENC_SEED_ADMIN_EMAIL` / `FLASENC_SEED_ADMIN_PASSWORD`。
+- 详见 [`docs/BACKEND.md`](../../docs/BACKEND.md)。**`pnpm db:compose:*` / `docker-compose.mysql.yml`** 完全可选，可忽略。
+
 ## Project setup
 
 ```bash

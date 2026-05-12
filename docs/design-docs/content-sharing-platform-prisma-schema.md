@@ -11,13 +11,13 @@
 
 ## 1. 总览
 
-- **方言**：MySQL（`DATABASE_URL`）。  
-- **主体**：**`users` / `User`** 仅平台；**`member_users` / `MemberUser`** 仅 C 端（鉴权、Owner、兑换、评论、转让、通知）。  
-- **命名**：Prisma `model` PascalCase；`@@map` 表名为 **snake_case 复数**。  
-- **主键**：`String` + `@default(uuid())` + `@db.Char(36)`，与 HTTP UUID 一致。  
-- **敏感数据**：兑换码、转让码、卡片凭证仅存 **hash**（见 [`../SECURITY.md`](../SECURITY.md)）。  
-- **模板与内容**：**无** `Content` → `ContentTemplate` 外键；选用模板 = 应用层覆盖 `Content.body`。  
-- **转让并发**：「同一内容仅一笔 **PENDING**」由事务 + 计划中的部分唯一索引或等价约束保证；现建有 `(contentId, status)` 普通索引。
+- **方言**：MySQL（`DATABASE_URL`）。
+- **主体**：**`users` / `User`** 仅平台；**`member_users` / `MemberUser`** 仅 C 端（鉴权、Owner、兑换、评论、转让、通知）。
+- **命名**：Prisma `model` PascalCase，**字段** camelCase；**MySQL 列名** **`snake_case`**（`@map`）；`@@map` 表名为 **snake_case 复数**。
+- **主键**：`String` + `@default(uuid())` + `@db.Char(36)`，与 HTTP UUID 一致。
+- **敏感数据**：兑换码、转让码、卡片凭证仅存 **hash**（见 [`../SECURITY.md`](../SECURITY.md)）。
+- **模板与内容**：**无** `Content` → `ContentTemplate` 外键；选用模板 = 应用层覆盖 `Content.body`。
+- **转让并发**：「同一内容仅一笔 **PENDING**」由事务 + 计划中的部分唯一索引或等价约束保证；现建有 `(content_id, status)` 普通索引。
 
 ---
 
@@ -139,10 +139,11 @@ erDiagram
 pnpm exec prisma validate --schema=libs/database/prisma/schema.prisma
 pnpm exec prisma format --schema=libs/database/prisma/schema.prisma
 pnpm exec prisma generate --schema=libs/database/prisma/schema.prisma
-pnpm exec prisma migrate dev --schema=libs/database/prisma/schema.prisma
+pnpm run db:migrate:dev    # 改 schema 后生成并应用迁移（开发机）
+pnpm run db:migrate:deploy # 空库 / CI / 生产：仅应用已有 migrations
 ```
 
-开发可用 **`prisma db push`**（与 `pretest:e2e` 等脚本一致）；生产建议 **`migrate deploy`**。
+版本化 DDL 位于 **`libs/database/prisma/migrations/`**；`pretest:e2e` 与 **`scripts/e2e-db-migrate-deploy.cjs`** 使用 **`prisma migrate deploy`**。临时对齐空库仍可用 **`prisma db push`**（不落迁移文件，勿替代生产流程）。
 
 ---
 
@@ -152,3 +153,4 @@ pnpm exec prisma migrate dev --schema=libs/database/prisma/schema.prisma
 |------|------|
 | 2026-05-11 | 首版：业务表、枚举、ER 图与索引说明 |
 | 2026-05-12 | 拆分 `User` / `MemberUser`；C 端字段与关系迁至 `member_users`；**`MemberUser.displayName`** |
+| 2026-05-12 | MySQL **列名**统一为 **`snake_case`**（Prisma `@map`）；重写 **`20260512100000_init`** DDL |

@@ -9,7 +9,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { OffsetPageQueryDto } from '@app/http';
 import type { AdminAuthedRequest } from '../auth/admin-jwt-auth.guard';
 import { AdminJwtAuthGuard } from '../auth/admin-jwt-auth.guard';

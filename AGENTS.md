@@ -2,7 +2,7 @@
 
 本仓库采用 **[Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)** 思路：**人类掌舵、智能体执行**；**仓库内已版本化的文档与脚本为记录系统**；情境中读不到的约定视为不存在。
 
-- **文档第一版（MVP）范围与索引**：[`docs/MVP.md`](docs/MVP.md)（必读/扩展分层；联调以该页所列真源为准）。
+- **文档入口与分层**：[`docs/MVP.md`](docs/MVP.md)（最短路径 / 按任务 / 参考模板；联调以该页所列真源为准）。
 - **端到端研发链路（简版）**：[`docs/development-lifecycle.md`](docs/development-lifecycle.md)
 - **渐进式披露**：本文件只做索引与硬约束；细节在 `docs/` 各子目录。
 
@@ -12,7 +12,7 @@
 
 | 路径 | 包名 | 职责 |
 |------|------|------|
-| `apps/admin-web/` | `@flasenc/admin-web` | 管理后台（React + Rsbuild）。 |
+| `apps/admin-web/` | `@flasenc/admin-web` | 管理后台（React + Vite + shadcn/ui，基于 `satnaing/shadcn-admin` 改造）。 |
 | `apps/mobile/` | `@flasenc/mobile` | uni-app 多端客户端（Vue 3）。 |
 | `apps/server/` | `@flasenc/server` | 后端 API（NestJS）；与前端仅经 HTTP/契约通信。 |
 | `packages/ui/` | `@repo/ui` | 共享 React 组件。 |
@@ -23,30 +23,19 @@
 
 ---
 
-## 2. 文档地图（按任务）
+## 2. 文档地图（瘦入口）
 
-完整分层见 [`docs/MVP.md`](docs/MVP.md)。下表为高频入口。
+先读 [`docs/MVP.md`](docs/MVP.md)。日常开发只需要：
 
-| 需求 | 路径 |
+| 目的 | 路径 |
 |------|------|
-| **MVP 文档索引（先读）** | [`docs/MVP.md`](docs/MVP.md) |
-| 全流程（简版） | [`docs/development-lifecycle.md`](docs/development-lifecycle.md) |
-| 架构边界与分层 | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| **前端开发规范** | [`docs/FRONTEND.md`](docs/FRONTEND.md) |
-| **后端（Nest）开发规范** | [`docs/BACKEND.md`](docs/BACKEND.md) |
-| **HTTP API 与 `error.code`** | [`docs/api/http-api-specification.md`](docs/api/http-api-specification.md) |
-| 安全 | [`docs/SECURITY.md`](docs/SECURITY.md) |
-| 工程与设计原则（补充） | [`docs/DESIGN.md`](docs/DESIGN.md) |
-| 可靠性 / 可观测 | [`docs/RELIABILITY.md`](docs/RELIABILITY.md) |
-| **发布 Runbook** | [`docs/runbook/release-checklist.md`](docs/runbook/release-checklist.md) |
-| 质量与测试 | [`docs/QUALITY_SCORE.md`](docs/QUALITY_SCORE.md) |
-| 产品原则 | [`docs/PRODUCT_SENSE.md`](docs/PRODUCT_SENSE.md) |
-| 里程碑 | [`docs/PLANS.md`](docs/PLANS.md) |
-| 执行计划与技术债 | [`docs/exec-plans/`](docs/exec-plans/) |
+| 架构边界 | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | 命令速查 | [`docs/references/repo-commands-llms.txt`](docs/references/repo-commands-llms.txt) |
-| 工具生成物（勿手改） | [`docs/generated/`](docs/generated/) |
-| 设计文档索引 | [`docs/design-docs/index.md`](docs/design-docs/index.md) |
-| 产品规格入口 | [`docs/product-specs/index.md`](docs/product-specs/index.md) |
+| 协作流程 / 记录口径 | [`docs/development-lifecycle.md`](docs/development-lifecycle.md) |
+| HTTP API 与 `error.code` | [`docs/api/http-api-specification.md`](docs/api/http-api-specification.md) |
+| 前端 / 后端规范 | [`docs/FRONTEND.md`](docs/FRONTEND.md) / [`docs/BACKEND.md`](docs/BACKEND.md) |
+
+产品、方案、发布、安全、可靠性等专题文档按任务从 [`docs/MVP.md`](docs/MVP.md) 下钻，避免入口层继续膨胀。
 
 ---
 
@@ -65,6 +54,7 @@
 
 - **反馈回路**：自测、CI、提测、QA、线上监控的结论回写文档或 Issue/PR。
 - **小步合并**：任务勾选与 `docs/exec-plans` 或 Issue 对齐（以仓库内链接为准）。
+- **记录系统优先**：重要判断、评审结论、风险接受、发布检查必须能从仓库记录追溯；聊天上下文不是长期真源。
 - **给地图不给百科全书**：大段说明拆到 `docs/development-lifecycle.md` 与专题页。
 
 ---
@@ -77,6 +67,6 @@
 
 ## 6. 待补齐（维护者）
 
-- [ ] 在 `.github/CODEOWNERS` 中取消注释并填写真实 `@` 用户或团队。  
-- [ ] 将 `@flasenc/mobile` 的 `lint` / `check-types` 与根 turbo 对齐（可选，便于一条命令覆盖全仓）。  
+- [ ] 在 `.github/CODEOWNERS` 中取消注释并填写真实 `@` 用户或团队。
+- [ ] 将 `@flasenc/mobile` 的 `lint` 与根 turbo 对齐（可选，便于一条命令覆盖全仓）。
 - [ ] 在 `docs/RELIABILITY.md` 的 **SLO / 告警** 表中填入真实服务名与监控链接（模板与清单已就绪）。
