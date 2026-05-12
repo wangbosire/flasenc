@@ -55,7 +55,8 @@
 
 - 优先 **函数组件**；副作用集中在 `useEffect` 或与数据库无关的可预测位置。
 - 可组合逻辑用 **自定义 Hook**（`use*`），命名以领域含义为准。
-- **状态**：局部用 `useState`；跨布局 / 路由共享用 Zustand；服务端状态优先用 TanStack Query。
+- **先看依赖再开发**：开发新功能前先检查 `apps/admin-web/package.json` 与既有 `src/` 用法；优先复用已安装的 TanStack、shadcn/ui、Radix、react-hook-form、zod、sonner、Zustand、lucide-react 等能力，避免重复造轮子。
+- **状态**：局部表单草稿用 `useState` 或 react-hook-form；跨布局 / 路由共享用 Zustand；服务端状态必须优先用 **TanStack Query**（`useQuery` / `useMutation` / `invalidateQueries`），避免在业务组件中手写加载、缓存、重试与刷新逻辑。
 - **路由**：新增页面优先使用 `src/routes/` 文件路由，并同步侧边栏配置。
 
 ### 2.4 样式

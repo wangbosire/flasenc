@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { TopNav } from '@/components/layout/top-nav'
+// import { TopNav } from '@/components/layout/top-nav'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
@@ -23,7 +23,8 @@ export function Dashboard() {
     <>
       {/* ===== Top Heading ===== */}
       <Header>
-        <TopNav links={topNav} className='me-auto' />
+        {/* <TopNav links={topNav} className='me-auto' /> */}
+        <div className='me-auto'></div>
         <Search />
         <ThemeSwitch />
         <ConfigDrawer />

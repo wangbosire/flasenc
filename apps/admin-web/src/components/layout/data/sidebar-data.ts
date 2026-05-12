@@ -15,7 +15,6 @@ import {
   Wrench,
   UserCog,
   UserX,
-  Users,
   MessageSquareText,
   ShieldCheck,
   ClipboardList,
@@ -42,46 +41,45 @@ export const sidebarData: SidebarData = {
       logo: Command,
       plan: 'Content Platform',
     },
-    {
-      name: 'Admin API',
-      logo: GalleryVerticalEnd,
-      plan: '/admin/v1',
-    },
   ],
   navGroups: [
     {
-      title: '内容平台',
+      title: '首页',
       items: [
         {
-          title: '运营概览',
+          title: '数据概览',
           url: '/',
           icon: LayoutDashboard,
-        },
-        {
-          title: '内容复核',
-          url: '/tasks',
-          icon: Newspaper,
-          badge: 'MVP',
-        },
-        {
-          title: '权益与兑换码',
-          url: '/apps',
-          icon: Ticket,
-        },
-        {
-          title: '评论管理',
-          url: '/chats',
-          icon: MessageSquareText,
-        },
-        {
-          title: '会员与 Owner',
-          url: '/users',
-          icon: Users,
         },
       ],
     },
     {
-      title: '治理',
+      title: '内容管理',
+      items: [
+        {
+          title: '模板列表',
+          url: '/content-templates',
+          icon: FileText,
+        },
+        {
+          title: '权益管理',
+          url: '/entitlements',
+          icon: Newspaper,
+        },
+        {
+          title: '评论管理',
+          url: '/comments',
+          icon: MessageSquareText,
+        },
+        {
+          title: '转让记录',
+          url: '/transfer-records',
+          icon: KeyRound,
+        },
+      ],
+    },
+    {
+      title: '审核管理',
       items: [
         {
           title: '模板与发布',
@@ -105,12 +103,12 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: '审计日志',
-              url: '/tasks',
+              url: '/users',
               icon: ClipboardList,
             },
             {
               title: '转让记录',
-              url: '/apps',
+              url: '/tasks',
               icon: KeyRound,
             },
           ],
@@ -177,7 +175,7 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: '系统',
+      title: '系统管理',
       items: [
         {
           title: '设置',
