@@ -7,7 +7,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 // import { AppTitle } from './app-title'
-import { sidebarData } from './data/sidebar-data'
+import { useResolvedAdminSidebarData } from '@/hooks/use-admin-menu'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
 // import { TeamSwitcher } from './team-switcher'
@@ -15,6 +15,7 @@ import { AppTitle } from './app-title'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
+  const { sidebarData } = useResolvedAdminSidebarData()
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>

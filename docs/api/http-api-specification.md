@@ -207,14 +207,22 @@
 |----------|--------|----------------|------|
 | **Auth / 会话** | `front` + `admin` | **双 token**：**access**（短 TTL，**`Authorization: Bearer`**）与 **refresh**（长 TTL，独立 **`JWT_REFRESH_SECRET`** 签名）。C 端：**`POST /api/v1/auth/register`**、**`POST /api/v1/auth/login`**、**`POST /api/v1/auth/wechat/mini-program`**（微信小程序 **`code`** 换会话，体 **`{ code }`**，响应与 **`login`** 一致）、**`POST /api/v1/auth/refresh`**（体 **`{ refreshToken }`**，返回新 **access**+**refresh** 轮换）；管理端：**`POST /admin/v1/auth/login`**、**`POST /admin/v1/auth/refresh`**（同上；仅 **`platformAdmin`**）。**`JWT_SECRET`** 签 **access**，**`sub`** 语义：C 端 **`member_users.id`**，管理端 **`users.id`**。**`logout`** 仍待实现 | 匿名读已发布内容走公开 `GET .../contents/...`，不列在本组。 |
 | **会员资料 / 通知偏好** | `front` | **`GET /api/v1/auth/me`**、**`PATCH /api/v1/auth/me`**（须 Bearer；摘要含 **`displayName`**；**`email`** 对纯微信账号可为空串 **`""`**；PATCH：**`currentPassword`**+**`newPassword`** 成对改密且账号须已存在 **`passwordHash`**，否则 **`AUTH_PASSWORD_NOT_SET`**；**`displayName`** 可选字符串或 **`null`** 清空，二者至少其一；**`.strict()`**）；**`GET/PATCH /api/v1/member-notification-preferences`**（须 Bearer；体为可选 **`channelInApp`**、**`channelMiniProgram`** 布尔，PATCH 至少一项；GET 无行时按默认 **`true`/`false`** 合并，**`updatedAt`** 可为 **`null`**） | 评论通知渠道等；路径与字段以 OpenAPI 为准。 |
-| **Entitlements / 兑换码** | `admin` | `POST /api/v1/content-entitlements`、`GET /api/v1/content-entitlements`、`GET /api/v1/content-entitlements/{entitlementId}`；`POST /api/v1/content-entitlements/{entitlementId}/redemption-codes`（生成码）；`POST /api/v1/redemption-codes/{codeId}/actions/invalidate`（置失效） | 创建权益时服务端事务创建占位 `Content`；列表筛选参数在接口清单中固定。 |
+| **Entitlements / 兑换码** | `admin` | **`POST /admin/v1/content-entitlements`** 与 **`POST /admin/v1/content-entitlements/redemption-codes`** 均为同事务创建占位内容、权益与 **唯一**兑换码（响应 **`plainCode`** 仅一次）；**`POST /admin/v1/content-entitlements/{entitlementId}/redemption-codes`** 仅用于历史上「有权益尚无码」的补建，若该权益已有码则 **`CONTENT_REDEMPTION_CODE_ALREADY_ISSUED`**（**409**）；`POST /api/v1/redemption-codes/{codeId}/actions/invalidate`（置失效，待实现口径以 OpenAPI 为准） | 内容与权益、兑换码 **1:1:1**（每条权益至多一条兑换码）。 |
 | **Redemption（兑换）** | `front` | `POST /api/v1/redemptions` 或 `POST /api/v1/redemption-codes/actions/redeem` | **须** `Authorization: Bearer`；体载 `{ "code": "..." }` 等；幂等键按 **§6** 在清单中标注。 |
-| **Contents** | `front` + `admin` | **C 端**（`/api/v1`）：`GET`（匿名须 **`PUBLISHED` 或 `SUSPICIOUS_PUBLISHED`** 且 **`listingState=NORMAL`**；Owner 可读草稿等）、`PATCH`（Owner 草稿/退回态）、`POST .../submit-publish`（事务内 **`SUBMITTED`** + `moderation_jobs`=`QUEUED`；终态由机审 worker 异步落库，noop 行为见 **`CONTENT_MODERATION_NOOP_OUTCOME`**）。**管理端**（`/admin/v1`）：**`GET .../contents/{contentId}`**（平台复核只读，含 `body`、**`entitlementId`**）；**`GET .../contents/queues/suspicious`**（列表项含 **`entitlementId`**）；`POST .../actions/clear-suspicion` / **`mark-manually-rejected`**（仅 **`SUSPICIOUS_PUBLISHED`**）；`POST .../actions/unlist` / `hide` / `restore-listing`（下架/隐藏仅 **`PUBLISHED`/`SUSPICIOUS_PUBLISHED`**） | 上架态与 C 端匿名读规则对齐。 |
+| **Contents** | `front` + `admin` | **C 端**（`/api/v1`）：`GET`（匿名须 **`PUBLISHED` 或 `SUSPICIOUS_PUBLISHED`** 且 **`listingState=NORMAL`**；Owner 可读草稿等）、`PATCH`（Owner 草稿/退回态）、`POST .../submit-publish`（事务内 **`SUBMITTED`** + `moderation_jobs`=`QUEUED`；终态由机审 worker 异步落库，noop 行为见 **`CONTENT_MODERATION_NOOP_OUTCOME`**）。**管理端**（`/admin/v1`）：**`GET .../contents`**（**`page`/`pageSize`**；可选 **`AND`** 筛选：`contentId`、`publishStatus`、`listingState`、`placeholderKind`、`ownerMemberId`、`entitlementId`、`titleContains`、`createdFrom`/`createdTo`、`updatedFrom`/`updatedTo`、`hasEntitlement`、`hasOwner`、`redemptionPlainContains`、`redemptionCodeId`、`redemptionCodeStatus`；响应含 `entitlementId`、兑换码数量与最近兑换码记录 **`id`/`status`/可选 `plainCode`（旧码未落库时为 **`null`**）；**不**返回 **`codeHash`**）；**`PATCH .../contents/{contentId}/permissions`**（编辑 `publishStatus` / `listingState`）；**`POST .../contents/{contentId}/actions/submit-moderation`**（管理员发起审核，入队 `moderation_jobs`）；**`GET .../contents/{contentId}`**（平台复核只读，含 `body`、**`entitlementId`**）；**`GET .../contents/queues/suspicious`**（列表项含 **`entitlementId`**）；`POST .../actions/clear-suspicion` / **`mark-manually-rejected`**（仅 **`SUSPICIOUS_PUBLISHED`**）；`POST .../actions/unlist` / `hide` / `restore-listing`（下架/隐藏仅 **`PUBLISHED`/`SUSPICIOUS_PUBLISHED`**） | 上架态与 C 端匿名读规则对齐；兑换码明文持久化供管理端列表复制，**不得**写入审计 payload；C 端兑换接口仍以用户输入明文经服务端哈希校验。 |
 | **Templates** | `admin` + `front` | 管理端：`GET/POST /api/v1/content-templates`、`GET/PATCH/DELETE /api/v1/content-templates/{templateId}`、`POST /api/v1/content-templates/{templateId}/actions/shelf-on` / `.../shelf-off`（或 `PATCH` 表达上下架）；C 端：`GET /api/v1/content-templates`（仅上架）；`POST /api/v1/contents/{contentId}/actions/apply-template` | Owner **应用模板**为写 `Content` 的动作，路径挂在 `contents` 下便于鉴权。 |
 | **Comments** | `front` | **`GET /api/v1/contents/{contentId}/comments`**（**`page`/`pageSize`**，默认 1/20，**`pageSize`≤100**；与 **`GET .../contents/{id}`** 同可见性）；**`POST .../contents/{contentId}/comments`**（须 Bearer；**`body`** JSON；可选 **`anchorId`** 串内回复、**`replyToCommentId`**；根评论不得带 **`replyToCommentId`**）；**`DELETE /api/v1/comments/{commentId}`**（作者或 **Owner** 软删 **`deletedAt`**，**200** `{ ok: true }`） | 二层串：`parentId` 恒为锚点 id；相关 **`error.code`** 见 §11.2。 |
 | **Transfers** | `front` + `admin` | **`GET /api/v1/contents/{contentId}/transfers`**（须 Bearer；**仅 Owner**；**`page`/`pageSize`** 默认 1/20，**`pageSize`≤100**；**`createdAt` desc**；项含 **`id`**、**`method`**、**`status`**、**`expiresAt`**、**`createdAt`**、**`confirmedAt`**、**`revokedAt`**）。**`POST .../contents/{contentId}/transfers`**（须 Bearer；**仅 Owner**；体 **`{ "method": "TRANSFER_CODE" \| "CARD_SHARE" }`**，**`.strict()`**；内容须 **`PUBLISHED` 或 `SUSPICIOUS_PUBLISHED`** 且 **`listingState=NORMAL`**；**`201`** **`data`**：**`transferId`**、**`method`**、**`expiresAt`**；**`TRANSFER_CODE`** 额外一次性 **`transferCode`**；**`CARD_SHARE`** 额外一次性 **`cardToken`**）。**`POST /api/v1/transfers/{transferId}/actions/revoke`**（发起方、**`PENDING`**→**`REVOKED`**）。**`POST /api/v1/transfers/{transferId}/actions/confirm`**（非发起方；体 **须且仅能** 填 **`transferCode`** 或 **`cardToken`** 之一；成功 **`200`** **`{ ok: true, contentId }`** 且 **`Content.ownerMemberId`** 改为确认人）。**管理端**：**`GET /admin/v1/contents/{contentId}/transfer-records`**（**`AdminJwtAuthGuard`**；内容不存在或非法 UUID **404**；**`page`/`pageSize`** 默认 1/20、上限 100；**`createdAt` desc**；项含 **`id`**、**`contentId`**、**`fromMemberId`**、**`toMemberId`**、**`method`**、**`status`**、**`expiresAt`**、**`createdAt`**、**`confirmedAt`**、**`revokedAt`**；**不**含明文 **`transferCode`/`cardToken`**） | **同一内容一条 `PENDING`**；**`expiresAt`** 由服务端按业务时区规则计算（实现见 **`libs/shared`** **`transferExpiresAtShanghai`**）；确认接口校验过期；**`TransferExpiryProcessorService`**（约 **60s** **`@Interval`**）将仍 **`PENDING`** 且已过 **`expiresAt`** 的转让单批置 **`EXPIRED`**（审计 **`CONTENT_TRANSFER_EXPIRE_JOB`**，`actor*` 为空）。 |
 | **Notifications** | `front` | **`GET /api/v1/in-app-notifications`**（须 Bearer；**`page`** / **`pageSize`** 分页，**`onlyUnread`**=`true`/`false`/`1`/`0` 筛未读）、**`PATCH .../in-app-notifications/{notificationId}`**（已读，**幂等**；非本人或非法 id 形态 **`404 NOT_FOUND`**）；服务端在 **兑换成功**、**机审终态** 等路径 **同事务** 写入站内信（**`channelInApp=false`** 时跳过） | MVP 路径以实现为准。 |
 | **Audit** | `admin` | **`GET /admin/v1/audit-logs`**：`page`（默认 1）、`pageSize`（默认 20，最大 100）、`action`、`targetType`、`targetId`、`actorUserId`、`actorMemberId`（UUID）、`from`/`to`（ISO8601，筛 `createdAt`） | 须 **`platformAdmin`**（`AdminJwtAuthGuard`）；导出若走异步另列清单。 |
+| **Admin Menus** | `admin` | **`GET /admin/v1/menu-items/tree`**（侧栏/命令面板启用菜单树）、**`GET /admin/v1/menu-items`**（管理页全量列表）、**`POST /admin/v1/menu-items`**、**`PATCH /admin/v1/menu-items/{id}`**、**`DELETE /admin/v1/menu-items/{id}`**、**`PATCH /admin/v1/menu-items/reorder`**（批量调整父级与排序） | 须 **`platformAdmin`**；菜单链接可为站内路径或外链；根节点为分组，二级可为链接或折叠项，三级必须为链接。 |
+
+#### Admin Menus 字段与层级约定
+
+- **菜单项字段**：`id`、`parentId`、`title`、`routePath`、`iconKey`、`sortOrder`、`enabled`、`createdAt`、`updatedAt`。树接口额外返回 `children`。
+- **`routePath`**：可为空；为空表示分组或折叠项。非空时可为站内路径（如 `/system/menus`）或外链（如 `https://example.com`、`mailto:`、`tel:`）。服务端不做“已注册路由”白名单判断。
+- **层级**：根节点必须无 `routePath`；二级节点可直接绑定链接，也可作为折叠项；三级节点必须绑定 `routePath`；三级以下不支持。
+- **删除**：存在子菜单时拒绝删除，先移动或删除子节点。
 
 ### 11.2 业务错误码（内容分享域，MVP）
 
@@ -242,6 +250,7 @@
 | `CONTENT_REDEMPTION_CODE_ALREADY_USED` | 409 | 一码一用：已成功兑换或并发下未抢到更新 | 可 |
 | `CONTENT_ENTITLEMENT_NOT_FOUND` | 404 | 管理端引用的内容权益 id 不存在 | 可 |
 | `CONTENT_REDEMPTION_CODE_PLAIN_CONFLICT` | 409 | 管理端指定明文兑换码与库内已有哈希冲突（换明文后重试） | 可 |
+| `CONTENT_REDEMPTION_CODE_ALREADY_ISSUED` | 409 | 该权益已有一条兑换码（**1:1:1**），不得再 **`POST .../{entitlementId}/redemption-codes`** | 可 |
 | `COMMENT_DEPTH_LIMIT_EXCEEDED` | 400 | 评论第三层/深度规则违反（仅允许二层结构） | 可 |
 | `CONTENT_TRANSFER_SELF_NOT_ALLOWED` | 400 | 受让人与转让人为同一账号 | 可 |
 | `CONTENT_TRANSFER_EXPIRED` | 400 或 409 | 转让邀约已过 `expiresAt`（第 7 自然日截止后） | 可 |
@@ -255,6 +264,7 @@
 | `CONTENT_VALIDATION_FAILED` | 422 | 内容正文/块结构等业务校验失败（`error.details` 细化字段） | 可 |
 | `CONTENT_PATCH_FORBIDDEN_STATE` | 409 | 当前 `publishStatus` 不允许 Owner 编辑（如已 `PUBLISHED`） | 可 |
 | `CONTENT_SUBMIT_PUBLISH_FORBIDDEN_STATE` | 409 | 当前 `publishStatus` 不允许再次提交发布（如已 `PUBLISHED`） | 可 |
+| `CONTENT_ADMIN_SUBMIT_MODERATION_FORBIDDEN_STATE` | 409 | 管理端发起审核时当前 `publishStatus` 不在可提交状态（仅草稿/退回态可入队） | 可 |
 | `CONTENT_PLATFORM_LISTING_ACTION_INVALID_STATE` | 409 | 非已发布/疑似已发布态，不可执行平台下架或紧急隐藏 | 可 |
 | `CONTENT_PLATFORM_RESTORE_NOT_APPLICABLE` | 409 | 当前 `listingState` 非下架/隐藏，无法执行恢复上架（`NORMAL` 除外幂等） | 可 |
 | `CONTENT_PLATFORM_SUSPICION_RESOLUTION_INVALID_STATE` | 409 | 当前非 **`SUSPICIOUS_PUBLISHED`**，不可执行消除疑似或人工标记失败 | 可 |
@@ -262,6 +272,11 @@
 | `COMMENT_ANCHOR_INVALID` | 400 | **`anchorId`** 非本内容下有效锚点（已删或非锚点行） | 可 |
 | `COMMENT_REPLY_TARGET_INVALID` | 400 | **`replyToCommentId`** 不存在或不在同一锚点串内 | 可 |
 | `CONTENT_COMMENT_DELETE_FORBIDDEN` | 403 | 删除者非作者且非内容 **Owner** | 可 |
+| `ADMIN_MENU_ITEM_NOT_FOUND` | 404 | 管理后台菜单项不存在 | 可 |
+| `ADMIN_MENU_PARENT_NOT_FOUND` | 404 | 菜单项指定的父级不存在 | 可 |
+| `ADMIN_MENU_INVALID_STRUCTURE` | 400 | 菜单层级或父子关系不符合分组/折叠项/链接规则 | 可 |
+| `ADMIN_MENU_DELETE_HAS_CHILDREN` | 409 | 删除菜单项前须先删除或移动子菜单 | 可 |
+| `ADMIN_MENU_ROUTE_CONFLICT` | 409 | 同一路由已被其他菜单项使用 | 可 |
 
 **说明**：通用字段格式错误可用 **`VALIDATION_FAILED`**（§7.2）；内容 JSON 载体专项校验使用上表 **`CONTENT_VALIDATION_FAILED`**（与通用 422 区分）。
 

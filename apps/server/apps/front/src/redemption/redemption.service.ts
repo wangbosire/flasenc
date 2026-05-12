@@ -38,16 +38,33 @@ export class RedemptionService {
     plainCode: string;
   }): Promise<RedeemResult> {
     const { memberId } = params;
-    const codeHash = hashRedemptionCode(params.plainCode);
+    const trimmedPlain = params.plainCode.trim();
+    if (!trimmedPlain) {
+      throw new DomainHttpException(
+        422,
+        'VALIDATION_FAILED',
+        '兑换码不能为空',
+        {},
+      );
+    }
+    const codeHash = hashRedemptionCode(trimmedPlain);
 
     await assertMemberUserRowExists(this.prisma, memberId);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        const row = await tx.redemptionCode.findUnique({
-          where: { codeHash },
-          include: { entitlement: { include: { content: true } } },
-        });
+        /**
+         * 业务上以 **库内明文列** 为准；仅当历史行未写入 `plain_code` 时再用 `code_hash` 命中（摘要不是加密，仅为兼容与唯一约束）。
+         */
+        const row =
+          (await tx.redemptionCode.findFirst({
+            where: { plainCode: trimmedPlain },
+            include: { entitlement: { include: { content: true } } },
+          })) ??
+          (await tx.redemptionCode.findUnique({
+            where: { codeHash },
+            include: { entitlement: { include: { content: true } } },
+          }));
 
         if (!row) {
           throw new DomainHttpException(

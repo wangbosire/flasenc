@@ -19,12 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
 import { NewChat } from './components/new-chat'
 import { type ChatUser, type Convo } from './data/chat-types'
 // Fake Data
@@ -64,23 +59,14 @@ export function Chats() {
   const users = conversations.map(({ messages, ...user }) => user)
 
   return (
-    <>
-      {/* ===== Top Heading ===== */}
-      <Header>
-        <Search className='me-auto' />
-        <ThemeSwitch />
-        <ConfigDrawer />
-        <ProfileDropdown />
-      </Header>
-
-      <Main fixed>
-        <section className='flex h-full gap-6'>
+    <Main fixed>
+      <section className='flex h-full gap-6'>
           {/* Left Side */}
           <div className='flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80'>
             <div className='sticky top-0 z-10 -mx-4 bg-background px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none'>
               <div className='flex items-center justify-between py-2'>
                 <div className='flex gap-2'>
-                  <h1 className='text-2xl font-bold'>Inbox</h1>
+                  <h1 className='text-2xl font-bold'>收件箱</h1>
                   <MessagesSquare size={20} />
                 </div>
 
@@ -346,6 +332,5 @@ export function Chats() {
           open={createConversationDialogOpened}
         />
       </Main>
-    </>
   )
 }

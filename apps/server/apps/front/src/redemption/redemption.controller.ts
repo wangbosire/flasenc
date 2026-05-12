@@ -14,15 +14,17 @@ import type { AuthedRequest } from '../auth/jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RedemptionService } from './redemption.service';
 
-/** 明文兑换码；落库只存 hash，校验逻辑在 Service。 */
+/** 明文兑换码；服务端优先按库列 **`plain_code`** 精确匹配，旧数据未落库明文时再按 **`code_hash`** 命中（单方摘要，非对称加密）。 */
 const redeemBodySchema = z.object({
   code: z
     .string()
     .min(1, '兑换码不能为空')
-    .describe('明文兑换码；服务端比对 hash，不在日志中回显。'),
+    .describe(
+      '明文兑换码；服务端按明文（必要时哈希兜底）匹配，日志不回显完整码。',
+    ),
 });
 
-/** DTO：已登录会员提交明文兑换码；服务端仅消费后比对 hash，不在此 DTO 存敏感持久化。 */
+/** DTO：已登录会员提交明文兑换码；校验落在 {@link RedemptionService.redeem}。 */
 class RedeemBodyDto extends createZodDto(redeemBodySchema) {}
 
 /**

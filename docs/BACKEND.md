@@ -80,6 +80,20 @@
 - **密钥**：仅环境变量或密钥管理服务；见 [`SECURITY.md`](SECURITY.md)。
 - **输入**：防注入、限流、敏感操作二次校验等按需求在技术方案中列项并实现。
 
+### 7.1 管理后台菜单
+
+- 菜单管理接口位于 **`apps/admin/src/menu`**，统一挂在 **`/admin/v1/menu-items`**，由 **`AdminJwtAuthGuard`** 限制为 `platformAdmin`。
+- 菜单层级由 Service 保证：根节点为侧栏分组；二级可为链接或折叠项；三级必须是具体链接；带链接的节点不得再拥有子菜单。
+- `routePath` 表示菜单链接，可为站内路径或外链；后端只校验长度、层级和唯一性，不维护路由白名单，也不判断前端是否存在对应页面。
+- 写操作须写审计动作（`ADMIN_MENU_ITEM_CREATE` / `UPDATE` / `REORDER` / `DELETE`），错误码与接口清单见 [`api/http-api-specification.md`](api/http-api-specification.md)。
+
+### 7.2 管理端内容与兑换码
+
+- 内容列表接口为 **`GET /admin/v1/contents`**，返回分页内容、`entitlementId`、`redemptionCodes`（最近若干条）、**嵌套 `entitlement`**（与扁平字段同源）、兑换码总数；兑换码明文仅管理端可读；**不**返回 `codeHash`。详情 **`GET /admin/v1/contents/{contentId}`** 在同结构上返回该内容关联权益下**全量**兑换码行（仍无 hash）。
+- 管理端可通过 **`PATCH /admin/v1/contents/{contentId}/permissions`** 编辑内容 `publishStatus` / `listingState`，通过 **`POST /admin/v1/contents/{contentId}/actions/submit-moderation`** 将草稿/退回态内容送入机审队列；两者均须写审计。
+- 运营 **`POST /admin/v1/content-entitlements`** 与 **`POST /admin/v1/content-entitlements/redemption-codes`** 均为同一事务创建占位 `Content`、`ContentEntitlement` 与唯一 `RedemptionCode`；响应中的 `plainCode` 仅出现一次。
+- **`POST /admin/v1/content-entitlements/{entitlementId}/redemption-codes`** 仅用于历史上「仅有权益尚无码」的补建；若该权益已有兑换码则 **`CONTENT_REDEMPTION_CODE_ALREADY_ISSUED`**（409）。内容与权益、兑换码按产品约定 **1:1:1**。
+
 ---
 
 ## 8. 测试

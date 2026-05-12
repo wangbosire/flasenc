@@ -78,8 +78,12 @@ describe('GET /admin/v1/audit-logs', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ title: 'aud-ent' })
       .expect(201);
-    const { entitlementId, contentId } = (
-      c.body as ApiSuccess<{ entitlementId: string; contentId: string }>
+    const { entitlementId, contentId, redemptionCodeId } = (
+      c.body as ApiSuccess<{
+        entitlementId: string;
+        contentId: string;
+        redemptionCodeId: string;
+      }>
     ).data;
 
     const list = await request(server())
@@ -104,7 +108,13 @@ describe('GET /admin/v1/audit-logs', () => {
     );
 
     await prisma.auditLog.deleteMany({
-      where: { OR: [{ targetId: contentId }, { targetId: entitlementId }] },
+      where: {
+        OR: [
+          { targetId: contentId },
+          { targetId: entitlementId },
+          { targetId: redemptionCodeId },
+        ],
+      },
     });
     await prisma.content.deleteMany({ where: { id: contentId } });
   });
@@ -277,8 +287,11 @@ describe('Admin API (e2e)', () => {
       const body = res.body as ApiSuccess<{
         entitlementId: string;
         contentId: string;
+        redemptionCodeId: string;
+        plainCode: string;
       }>;
       expect(body.success).toBe(true);
+      expect(body.data.plainCode.length).toBeGreaterThanOrEqual(4);
       contentId = body.data.contentId;
       const content = await prisma.content.findUniqueOrThrow({
         where: { id: body.data.contentId },
@@ -289,6 +302,12 @@ describe('Admin API (e2e)', () => {
       });
       expect(ent.contentId).toBe(body.data.contentId);
       expect(ent.createdByUserId).toBe(adminUserId);
+      const code = await prisma.redemptionCode.findUniqueOrThrow({
+        where: { id: body.data.redemptionCodeId },
+      });
+      expect(code.entitlementId).toBe(body.data.entitlementId);
+      expect(code.plainCode).toBe(body.data.plainCode);
+      expect(code.codeHash).toBe(hashRedemptionCode(body.data.plainCode));
       const aud = await prisma.auditLog.findFirst({
         where: {
           action: AuditAction.CONTENT_ENTITLEMENT_CREATE,
@@ -298,49 +317,100 @@ describe('Admin API (e2e)', () => {
       expect(aud).not.toBeNull();
       expect(aud!.actorUserId).toBe(adminUserId);
       expect(aud!.traceId).toBe(body.traceId);
+      const audCode = await prisma.auditLog.findFirst({
+        where: {
+          action: AuditAction.REDEMPTION_CODE_CREATE,
+          targetId: body.data.redemptionCodeId,
+        },
+      });
+      expect(audCode).not.toBeNull();
+      expect(audCode!.actorUserId).toBe(adminUserId);
     });
 
-    it('创建权益后生成兑换码并写入 codeHash', async () => {
+    it('权益已有兑换码时不得重复 POST …/redemption-codes', async () => {
       const c = await request(server())
         .post('/admin/v1/content-entitlements')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({})
         .expect(201);
-      const { entitlementId, contentId: cid } = (
+      const {
+        entitlementId,
+        contentId: cid,
+        plainCode,
+        redemptionCodeId,
+      } = (
         c.body as ApiSuccess<{
           entitlementId: string;
           contentId: string;
+          plainCode: string;
+          redemptionCodeId: string;
         }>
       ).data;
       contentId = cid;
 
-      const g = await request(server())
+      const row = await prisma.redemptionCode.findUniqueOrThrow({
+        where: { id: redemptionCodeId },
+      });
+      expect(row.plainCode).toBe(plainCode);
+      expect(row.codeHash).toBe(hashRedemptionCode(plainCode));
+
+      await request(server())
         .post(
           `/admin/v1/content-entitlements/${entitlementId}/redemption-codes`,
         )
         .set('Authorization', `Bearer ${adminToken}`)
         .send({})
+        .expect(409)
+        .expect((res: Response) => {
+          const fail = res.body as ApiFailure;
+          expect(fail.error.code).toBe(
+            'CONTENT_REDEMPTION_CODE_ALREADY_ISSUED',
+          );
+        });
+    });
+
+    it('一体化创建内容、权益并生成兑换码', async () => {
+      const res = await request(server())
+        .post('/admin/v1/content-entitlements/redemption-codes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'e2e-code-content', plainCode: 'E2E-CODE-ONE' })
         .expect(201);
-      const { plainCode, redemptionCodeId } = (
-        g.body as ApiSuccess<{
-          plainCode: string;
-          redemptionCodeId: string;
-        }>
-      ).data;
-      expect(plainCode.length).toBeGreaterThanOrEqual(4);
-      const row = await prisma.redemptionCode.findUniqueOrThrow({
-        where: { id: redemptionCodeId },
+      const body = res.body as ApiSuccess<{
+        entitlementId: string;
+        contentId: string;
+        redemptionCodeId: string;
+        plainCode: string;
+      }>;
+      contentId = body.data.contentId;
+
+      expect(body.data.plainCode).toBe('E2E-CODE-ONE');
+      const content = await prisma.content.findUniqueOrThrow({
+        where: { id: body.data.contentId },
+        include: { entitlement: true },
       });
-      expect(row.codeHash).toBe(hashRedemptionCode(plainCode));
-      expect(row.entitlementId).toBe(entitlementId);
-      const aud = await prisma.auditLog.findFirst({
-        where: {
-          action: AuditAction.REDEMPTION_CODE_CREATE,
-          targetId: redemptionCodeId,
-        },
+      expect(content.title).toBe('e2e-code-content');
+      expect(content.entitlement?.id).toBe(body.data.entitlementId);
+      const code = await prisma.redemptionCode.findUniqueOrThrow({
+        where: { id: body.data.redemptionCodeId },
       });
-      expect(aud).not.toBeNull();
-      expect(aud!.actorUserId).toBe(adminUserId);
+      expect(code.entitlementId).toBe(body.data.entitlementId);
+      expect(code.codeHash).toBe(hashRedemptionCode('E2E-CODE-ONE'));
+      expect(code.plainCode).toBe('E2E-CODE-ONE');
+
+      const list = await request(server())
+        .get('/admin/v1/contents?page=1&pageSize=10')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const page = list.body as ApiSuccess<{
+        items: Array<{
+          id: string;
+          entitlementId: string | null;
+          redemptionCodeCount: number;
+        }>;
+      }>;
+      const item = page.data.items.find((r) => r.id === body.data.contentId);
+      expect(item?.entitlementId).toBe(body.data.entitlementId);
+      expect(item?.redemptionCodeCount).toBe(1);
     });
 
     it('404 权益不存在时生成码失败', () => {
@@ -873,12 +943,18 @@ describe('Admin API (e2e)', () => {
           body: unknown;
           publishStatus: string;
           entitlementId: string | null;
+          redemptionCodeCount: number;
+          redemptionCodes: unknown[];
+          entitlement: null;
         }>;
         expect(body.data.id).toBe(row.id);
         expect(body.data.title).toBe('adm-detail');
         expect(body.data.publishStatus).toBe('DRAFT');
         expect(body.data.body).toEqual({ blocks: [] });
         expect(body.data.entitlementId).toBeNull();
+        expect(body.data.redemptionCodeCount).toBe(0);
+        expect(body.data.redemptionCodes).toEqual([]);
+        expect(body.data.entitlement).toBeNull();
       } finally {
         await prisma.content.delete({ where: { id: row.id } });
       }
@@ -890,23 +966,210 @@ describe('Admin API (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ title: 'ent-bound' })
         .expect(201);
-      const { entitlementId, contentId } = (
-        c.body as ApiSuccess<{ entitlementId: string; contentId: string }>
+      const { entitlementId, contentId, redemptionCodeId } = (
+        c.body as ApiSuccess<{
+          entitlementId: string;
+          contentId: string;
+          redemptionCodeId: string;
+        }>
       ).data;
       try {
         const res = await request(server())
           .get(`/admin/v1/contents/${contentId}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .expect(200);
-        const body = res.body as ApiSuccess<{ entitlementId: string | null }>;
+        const body = res.body as ApiSuccess<{
+          entitlementId: string | null;
+          redemptionCodeCount: number;
+          redemptionCodes: Array<{ id: string }>;
+          entitlement: {
+            id: string;
+            contentId: string;
+            status: string;
+            redemptionCodeCount: number;
+          } | null;
+        }>;
         expect(body.data.entitlementId).toBe(entitlementId);
+        expect(body.data.redemptionCodeCount).toBeGreaterThanOrEqual(1);
+        expect(body.data.redemptionCodes.length).toBeGreaterThanOrEqual(1);
+        expect(body.data.entitlement?.id).toBe(entitlementId);
+        expect(body.data.entitlement?.contentId).toBe(contentId);
+        expect(body.data.entitlement?.status).toBe('ACTIVE');
+        expect(body.data.entitlement?.redemptionCodeCount).toBe(
+          body.data.redemptionCodeCount,
+        );
       } finally {
         await prisma.auditLog.deleteMany({
           where: {
-            OR: [{ targetId: contentId }, { targetId: entitlementId }],
+            OR: [
+              { targetId: contentId },
+              { targetId: entitlementId },
+              { targetId: redemptionCodeId },
+            ],
           },
         });
         await prisma.content.deleteMany({ where: { id: contentId } });
+      }
+    });
+
+    it('内容列表返回兑换码明文且不暴露 hash', async () => {
+      const listPlain = `LIST-${randomUUID()}`;
+      const c = await request(server())
+        .post('/admin/v1/content-entitlements/redemption-codes')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'list-code', plainCode: listPlain })
+        .expect(201);
+      const { contentId, entitlementId, redemptionCodeId } = (
+        c.body as ApiSuccess<{
+          contentId: string;
+          entitlementId: string;
+          redemptionCodeId: string;
+        }>
+      ).data;
+      try {
+        const res = await request(server())
+          .get('/admin/v1/contents?page=1&pageSize=20')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+        const body = res.body as ApiSuccess<{
+          items: Array<{
+            id: string;
+            entitlementId: string | null;
+            redemptionCodeCount: number;
+            redemptionCodes: Array<{
+              id: string;
+              status: string;
+              codeHash?: string;
+              plainCode?: string;
+            }>;
+            entitlement: {
+              id: string;
+              contentId: string;
+              status: string;
+              redemptionCodeCount: number;
+              redemptionCodes: Array<{ id: string; plainCode?: string }>;
+            } | null;
+          }>;
+        }>;
+        const hit = body.data.items.find((item) => item.id === contentId);
+        expect(hit?.entitlementId).toBe(entitlementId);
+        expect(hit?.redemptionCodeCount).toBe(1);
+        expect(hit?.redemptionCodes[0]?.id).toBe(redemptionCodeId);
+        expect(hit?.redemptionCodes[0]?.status).toBe('ACTIVE');
+        expect(hit?.redemptionCodes[0]?.plainCode).toBe(listPlain);
+        expect(hit?.redemptionCodes[0]?.codeHash).toBeUndefined();
+        expect(hit?.entitlement?.id).toBe(entitlementId);
+        expect(hit?.entitlement?.contentId).toBe(contentId);
+        expect(hit?.entitlement?.status).toBe('ACTIVE');
+        expect(hit?.entitlement?.redemptionCodeCount).toBe(1);
+        expect(hit?.entitlement?.redemptionCodes[0]?.plainCode).toBe(listPlain);
+      } finally {
+        await prisma.auditLog.deleteMany({
+          where: {
+            OR: [
+              { targetId: contentId },
+              { targetId: entitlementId },
+              { targetId: redemptionCodeId },
+            ],
+          },
+        });
+        await prisma.content.deleteMany({ where: { id: contentId } });
+      }
+    });
+
+    it('GET /admin/v1/contents 支持 publishStatus 筛选', async () => {
+      const row = await prisma.content.create({
+        data: {
+          title: 'list-filter-draft',
+          publishStatus: 'DRAFT',
+          listingState: 'NORMAL',
+        },
+      });
+      try {
+        const filtered = await request(server())
+          .get('/admin/v1/contents?page=1&pageSize=100&publishStatus=PUBLISHED')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(200);
+        const body = filtered.body as ApiSuccess<{
+          items: Array<{ id: string; publishStatus: string }>;
+        }>;
+        expect(
+          body.data.items.every((i) => i.publishStatus === 'PUBLISHED'),
+        ).toBe(true);
+        expect(body.data.items.some((i) => i.id === row.id)).toBe(false);
+      } finally {
+        await prisma.content.deleteMany({ where: { id: row.id } });
+      }
+    });
+
+    it('PATCH permissions 可编辑发布态与上架态并写审计', async () => {
+      const row = await prisma.content.create({
+        data: {
+          title: 'perm-edit',
+          publishStatus: 'DRAFT',
+          listingState: 'NORMAL',
+        },
+      });
+      try {
+        const res = await request(server())
+          .patch(`/admin/v1/contents/${row.id}/permissions`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            publishStatus: 'PUBLISHED',
+            listingState: 'PLATFORM_UNLISTED',
+          })
+          .expect(200);
+        const body = res.body as ApiSuccess<{
+          publishStatus: string;
+          listingState: string;
+        }>;
+        expect(body.data.publishStatus).toBe('PUBLISHED');
+        expect(body.data.listingState).toBe('PLATFORM_UNLISTED');
+        const audit = await prisma.auditLog.findFirst({
+          where: {
+            action: AuditAction.PLATFORM_CONTENT_PERMISSION_UPDATE,
+            targetId: row.id,
+          },
+        });
+        expect(audit).not.toBeNull();
+        expect(audit!.actorUserId).toBe(adminUserId);
+      } finally {
+        await prisma.auditLog.deleteMany({ where: { targetId: row.id } });
+        await prisma.content.deleteMany({ where: { id: row.id } });
+      }
+    });
+
+    it('管理员可从内容列表发起内容审核', async () => {
+      const row = await prisma.content.create({
+        data: {
+          title: 'submit-moderation',
+          publishStatus: 'DRAFT',
+          listingState: 'NORMAL',
+        },
+      });
+      try {
+        const res = await request(server())
+          .post(`/admin/v1/contents/${row.id}/actions/submit-moderation`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({})
+          .expect(200);
+        const body = res.body as ApiSuccess<{ publishStatus: string }>;
+        expect(body.data.publishStatus).toBe('SUBMITTED');
+        const job = await prisma.moderationJob.findFirst({
+          where: { contentId: row.id },
+        });
+        expect(job?.state).toBe('QUEUED');
+        const audit = await prisma.auditLog.findFirst({
+          where: {
+            action: AuditAction.PLATFORM_CONTENT_SUBMIT_MODERATION,
+            targetId: row.id,
+          },
+        });
+        expect(audit?.actorUserId).toBe(adminUserId);
+      } finally {
+        await prisma.auditLog.deleteMany({ where: { targetId: row.id } });
+        await prisma.moderationJob.deleteMany({ where: { contentId: row.id } });
+        await prisma.content.deleteMany({ where: { id: row.id } });
       }
     });
   });
@@ -1073,3 +1336,207 @@ describe('Admin API (e2e)', () => {
     });
   });
 });
+
+describe('Admin menu items (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let adminToken: string;
+  let adminUserId: string;
+
+  const server = (): Server => app.getHttpServer() as Server;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AdminModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('admin/v1');
+    await app.init();
+
+    prisma = app.get(PrismaService);
+    await cleanupMenuRows(prisma);
+
+    const email = `menu-${randomUUID()}@x.test`;
+    const password = 'AdminPass11!!';
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: bcrypt.hashSync(password, 10),
+        platformAdmin: true,
+      },
+    });
+    adminUserId = user.id;
+    const loginRes = await request(server())
+      .post('/admin/v1/auth/login')
+      .send({ email, password })
+      .expect(200);
+    adminToken = (loginRes.body as ApiSuccess<AdminAuthTokenPairDto>).data
+      .accessToken;
+  });
+
+  afterEach(async () => {
+    await cleanupMenuRows(prisma);
+    await prisma.auditLog.deleteMany({ where: { actorUserId: adminUserId } });
+    await prisma.user.deleteMany({ where: { id: adminUserId } });
+    await app.close();
+  });
+
+  it('无 Authorization 时 401', () => {
+    return request(server()).get('/admin/v1/menu-items').expect(401);
+  });
+
+  it('非 platformAdmin 访问时 403', async () => {
+    const jwt = app.get(JwtService);
+    const user = await prisma.user.create({
+      data: { email: `menu-non-${randomUUID()}@x.test`, platformAdmin: false },
+    });
+    try {
+      const token = jwt.sign({ sub: user.id });
+      await request(server())
+        .get('/admin/v1/menu-items')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+        .expect((res: Response) => {
+          const body = res.body as ApiFailure;
+          expect(body.error.code).toBe('ADMIN_FORBIDDEN');
+        });
+    } finally {
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+
+  it('创建、禁用、树查询、删除菜单项', async () => {
+    const groupRes = await request(server())
+      .post('/admin/v1/menu-items')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'E2E菜单分组', sortOrder: 900 })
+      .expect(201);
+    const group = (groupRes.body as ApiSuccess<{ id: string }>).data;
+
+    const childRes = await request(server())
+      .post('/admin/v1/menu-items')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        parentId: group.id,
+        title: 'E2E菜单会话',
+        routePath: '/chats',
+        iconKey: 'Menu',
+        sortOrder: 10,
+      })
+      .expect(201);
+    const child = (childRes.body as ApiSuccess<{ id: string }>).data;
+
+    const tree = await request(server())
+      .get('/admin/v1/menu-items/tree')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const treeBody = tree.body as ApiSuccess<
+      Array<{ id: string; children: Array<{ id: string }> }>
+    >;
+    expect(
+      treeBody.data
+        .find((item) => item.id === group.id)
+        ?.children.some((item) => item.id === child.id),
+    ).toBe(true);
+
+    await request(server())
+      .patch(`/admin/v1/menu-items/${child.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ enabled: false })
+      .expect(200);
+
+    const disabledTree = await request(server())
+      .get('/admin/v1/menu-items/tree')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const disabledTreeBody = disabledTree.body as ApiSuccess<
+      Array<{ id: string; children: Array<{ id: string }> }>
+    >;
+    expect(
+      disabledTreeBody.data
+        .find((item) => item.id === group.id)
+        ?.children.some((item) => item.id === child.id),
+    ).toBe(false);
+
+    await request(server())
+      .delete(`/admin/v1/menu-items/${group.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(409)
+      .expect((res: Response) => {
+        const body = res.body as ApiFailure;
+        expect(body.error.code).toBe('ADMIN_MENU_DELETE_HAS_CHILDREN');
+      });
+
+    await request(server())
+      .delete(`/admin/v1/menu-items/${child.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    await request(server())
+      .delete(`/admin/v1/menu-items/${group.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+  });
+
+  it('允许自定义链接并支持根分组排序', async () => {
+    const customGroup = (
+      await request(server())
+        .post('/admin/v1/menu-items')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'E2E菜单自定义分组', sortOrder: 905 })
+        .expect(201)
+    ).body as ApiSuccess<{ id: string }>;
+
+    const customLink = await request(server())
+      .post('/admin/v1/menu-items')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        parentId: customGroup.data.id,
+        title: 'E2E菜单自定义链接',
+        routePath: 'https://example.com/admin-help',
+      })
+      .expect(201);
+    expect(
+      (customLink.body as ApiSuccess<{ routePath: string }>).data.routePath,
+    ).toBe('https://example.com/admin-help');
+
+    const first = (
+      await request(server())
+        .post('/admin/v1/menu-items')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'E2E菜单排序A', sortOrder: 910 })
+        .expect(201)
+    ).body as ApiSuccess<{ id: string }>;
+    const second = (
+      await request(server())
+        .post('/admin/v1/menu-items')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ title: 'E2E菜单排序B', sortOrder: 920 })
+        .expect(201)
+    ).body as ApiSuccess<{ id: string }>;
+
+    const reordered = await request(server())
+      .patch('/admin/v1/menu-items/reorder')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        items: [
+          { id: first.data.id, parentId: null, sortOrder: 920 },
+          { id: second.data.id, parentId: null, sortOrder: 910 },
+        ],
+      })
+      .expect(200);
+    const rows = (reordered.body as ApiSuccess<Array<{ id: string }>>).data;
+    expect(rows.findIndex((item) => item.id === second.data.id)).toBeLessThan(
+      rows.findIndex((item) => item.id === first.data.id),
+    );
+  });
+});
+
+async function cleanupMenuRows(prisma: PrismaService): Promise<void> {
+  await prisma.adminMenuItem.deleteMany({
+    where: { title: { startsWith: 'E2E菜单' }, parentId: { not: null } },
+  });
+  await prisma.adminMenuItem.deleteMany({
+    where: { title: { startsWith: 'E2E菜单' } },
+  });
+}

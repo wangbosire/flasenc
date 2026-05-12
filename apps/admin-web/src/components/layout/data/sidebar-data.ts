@@ -1,30 +1,19 @@
 import {
-  Construction,
   LayoutDashboard,
   Monitor,
-  Bug,
-  FileText,
-  FileX,
   HelpCircle,
-  Lock,
   Bell,
-  KeyRound,
+  FileText,
+  Menu,
+  Newspaper,
   Palette,
-  ServerOff,
   Settings,
+  ShieldAlert,
   Wrench,
   UserCog,
-  UserX,
-  MessageSquareText,
-  ShieldCheck,
   ClipboardList,
-  History,
-  Newspaper,
-  ShieldAlert,
-  WandSparkles,
   Command,
 } from 'lucide-react'
-import { ClerkLogo } from '@/assets/clerk-logo'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
@@ -55,24 +44,14 @@ export const sidebarData: SidebarData = {
       title: '内容管理',
       items: [
         {
-          title: '模板列表',
-          url: '/content-templates',
+          title: '内容列表',
+          url: '/contents',
           icon: FileText,
         },
         {
-          title: '权益管理',
-          url: '/entitlements',
+          title: '生成兑换码',
+          url: '/redemption-codes',
           icon: Newspaper,
-        },
-        {
-          title: '评论管理',
-          url: '/comments',
-          icon: MessageSquareText,
-        },
-        {
-          title: '转让记录',
-          url: '/transfer-records',
-          icon: KeyRound,
         },
       ],
     },
@@ -80,101 +59,25 @@ export const sidebarData: SidebarData = {
       title: '审核管理',
       items: [
         {
-          title: '模板与发布',
-          icon: WandSparkles,
-          items: [
-            {
-              title: '内容模板',
-              url: '/apps',
-              icon: FileText,
-            },
-            {
-              title: '机审队列',
-              url: '/tasks',
-              icon: ShieldAlert,
-            },
-          ],
+          title: '机审队列',
+          url: '/tasks',
+          icon: ShieldAlert,
         },
         {
-          title: '审计与追踪',
-          icon: History,
-          items: [
-            {
-              title: '审计日志',
-              url: '/users',
-              icon: ClipboardList,
-            },
-            {
-              title: '转让记录',
-              url: '/tasks',
-              icon: KeyRound,
-            },
-          ],
-        },
-        {
-          title: '认证页面',
-          icon: ShieldCheck,
-          items: [
-            {
-              title: '登录',
-              url: '/sign-in',
-            },
-            {
-              title: '忘记密码',
-              url: '/forgot-password',
-            },
-          ],
-        },
-        {
-          title: '错误页',
-          icon: Bug,
-          items: [
-            {
-              title: 'Unauthorized',
-              url: '/errors/unauthorized',
-              icon: Lock,
-            },
-            {
-              title: 'Forbidden',
-              url: '/errors/forbidden',
-              icon: UserX,
-            },
-            {
-              title: 'Not Found',
-              url: '/errors/not-found',
-              icon: FileX,
-            },
-            {
-              title: 'Internal Server Error',
-              url: '/errors/internal-server-error',
-              icon: ServerOff,
-            },
-            {
-              title: 'Maintenance Error',
-              url: '/errors/maintenance-error',
-              icon: Construction,
-            },
-          ],
-        },
-        {
-          title: 'Clerk 示例',
-          icon: ClerkLogo,
-          items: [
-            {
-              title: 'Clerk Sign In',
-              url: '/clerk/sign-in',
-            },
-            {
-              title: 'Clerk User Management',
-              url: '/clerk/user-management',
-            },
-          ],
+          title: '审计日志',
+          url: '/users',
+          icon: ClipboardList,
         },
       ],
     },
     {
       title: '系统管理',
       items: [
+        {
+          title: '菜单管理',
+          url: '/system/menus',
+          icon: Menu,
+        },
         {
           title: '设置',
           icon: Settings,

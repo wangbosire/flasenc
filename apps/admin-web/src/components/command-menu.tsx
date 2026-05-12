@@ -3,6 +3,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight, ChevronRight, Laptop, Moon, Sun } from 'lucide-react'
 import { useSearch } from '@/context/search-provider'
 import { useTheme } from '@/context/theme-provider'
+import { useResolvedAdminSidebarData } from '@/hooks/use-admin-menu'
+import { isExternalMenuUrl } from '@/lib/admin-menu-links'
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,13 +14,13 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
-import { sidebarData } from './layout/data/sidebar-data'
 import { ScrollArea } from './ui/scroll-area'
 
 export function CommandMenu() {
   const navigate = useNavigate()
   const { setTheme } = useTheme()
   const { open, setOpen } = useSearch()
+  const { sidebarData } = useResolvedAdminSidebarData()
 
   const runCommand = React.useCallback(
     (command: () => unknown) => {
@@ -26,6 +28,17 @@ export function CommandMenu() {
       command()
     },
     [setOpen]
+  )
+
+  const navigateMenuUrl = React.useCallback(
+    (url: string) => {
+      if (isExternalMenuUrl(url)) {
+        window.open(url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      navigate({ to: url })
+    },
+    [navigate]
   )
 
   return (
@@ -43,7 +56,7 @@ export function CommandMenu() {
                       key={`${navItem.url}-${i}`}
                       value={navItem.title}
                       onSelect={() => {
-                        runCommand(() => navigate({ to: navItem.url }))
+                        runCommand(() => navigateMenuUrl(String(navItem.url)))
                       }}
                     >
                       <div className='flex size-4 items-center justify-center'>
@@ -58,7 +71,7 @@ export function CommandMenu() {
                     key={`${navItem.title}-${subItem.url}-${i}`}
                     value={`${navItem.title}-${subItem.url}`}
                     onSelect={() => {
-                      runCommand(() => navigate({ to: subItem.url }))
+                      runCommand(() => navigateMenuUrl(String(subItem.url)))
                     }}
                   >
                     <div className='flex size-4 items-center justify-center'>

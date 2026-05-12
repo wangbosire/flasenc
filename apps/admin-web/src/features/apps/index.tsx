@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Copy, Loader2, Plus, Ticket } from 'lucide-react'
+import { Loader2, Plus, Ticket } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createContentEntitlement,
@@ -20,11 +20,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
+import { CopyableTextButton } from '@/components/copyable-value'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
 
 export function Apps() {
   const [title, setTitle] = useState('')
@@ -45,10 +42,11 @@ export function Apps() {
       setCreatedCode(null)
     },
     onSuccess: (result) => {
-      // 权益创建会同时生成占位内容，前端保存两个 id 以便继续生成兑换码或跳转复核。
+      // 与后端 1:1:1 约定一致：占位内容、权益与唯一兑换码同事务创建。
       setCreatedEntitlement(result)
       setEntitlementId(result.entitlementId)
-      toast.success('权益与占位内容已创建')
+      setCreatedCode(null)
+      toast.success('占位内容、权益与兑换码已创建')
     },
     onError: (err) => {
       setError(toMessage(err))
@@ -85,124 +83,114 @@ export function Apps() {
   }
 
   return (
-    <>
-      <Header>
-        <div className='me-auto'>
-          <h1 className='text-lg font-semibold'>权益与兑换码</h1>
-        </div>
-        <ThemeSwitch />
-        <ConfigDrawer />
-        <ProfileDropdown />
-      </Header>
+    <Main className='space-y-6'>
+      <div>
+        <p className='text-muted-foreground'>
+          创建权益接口会在同一事务内写入占位内容、权益与唯一兑换码；右侧表单仅用于历史上尚无码的权益补建。
+        </p>
+      </div>
 
-      <Main className='space-y-6'>
-        <div>
-          <h2 className='text-2xl font-bold tracking-tight'>权益发放</h2>
-          <p className='text-muted-foreground'>
-            创建内容权益、占位内容，并为权益生成一次性兑换码。
-          </p>
-        </div>
+      {error ? (
+        <Alert variant='destructive'>
+          <AlertTitle>操作失败</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
 
-        {error ? (
-          <Alert variant='destructive'>
-            <AlertTitle>操作失败</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
+      <div className='grid gap-4 lg:grid-cols-2'>
+        <Card>
+          <CardHeader>
+            <CardTitle>创建权益</CardTitle>
+            <CardDescription>
+              同事务创建占位 Content、ContentEntitlement 与一条 RedemptionCode。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className='space-y-4' onSubmit={submitEntitlement}>
+              <div className='space-y-2'>
+                <Label htmlFor='entitlement-title'>占位标题</Label>
+                <Input
+                  id='entitlement-title'
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder='例如：线下活动门票权益'
+                />
+              </div>
+              <Button disabled={loading}>
+                {loading ? <Loader2 className='animate-spin' /> : <Plus />}
+                创建权益
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-        <div className='grid gap-4 lg:grid-cols-2'>
-          <Card>
-            <CardHeader>
-              <CardTitle>创建权益</CardTitle>
-              <CardDescription>
-                后端会在同一事务内创建 ContentEntitlement 与占位 Content。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className='space-y-4' onSubmit={submitEntitlement}>
-                <div className='space-y-2'>
-                  <Label htmlFor='entitlement-title'>占位标题</Label>
-                  <Input
-                    id='entitlement-title'
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    placeholder='例如：线下活动门票权益'
-                  />
-                </div>
-                <Button disabled={loading}>
-                  {loading ? <Loader2 className='animate-spin' /> : <Plus />}
-                  创建权益
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>补建兑换码（可选）</CardTitle>
+            <CardDescription>
+              仅当目标权益在库中尚无兑换码时使用；若已通过左侧创建则会得到 409。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className='space-y-4' onSubmit={submitRedemptionCode}>
+              <div className='space-y-2'>
+                <Label htmlFor='entitlement-id'>entitlementId</Label>
+                <Input
+                  id='entitlement-id'
+                  required
+                  value={entitlementId}
+                  onChange={(event) => setEntitlementId(event.target.value)}
+                  className='font-mono'
+                  placeholder='00000000-0000-4000-8000-000000000000'
+                />
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='plain-code'>自定义明文码（可选）</Label>
+                <Input
+                  id='plain-code'
+                  value={plainCode}
+                  onChange={(event) => setPlainCode(event.target.value)}
+                  placeholder='不填则由服务端随机生成'
+                />
+              </div>
+              <Button disabled={loading}>
+                {loading ? <Loader2 className='animate-spin' /> : <Ticket />}
+                生成兑换码
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>生成兑换码</CardTitle>
-              <CardDescription>
-                可使用刚创建的 entitlementId，也可粘贴已有权益 id。
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className='space-y-4' onSubmit={submitRedemptionCode}>
-                <div className='space-y-2'>
-                  <Label htmlFor='entitlement-id'>entitlementId</Label>
-                  <Input
-                    id='entitlement-id'
-                    required
-                    value={entitlementId}
-                    onChange={(event) => setEntitlementId(event.target.value)}
-                    className='font-mono'
-                    placeholder='00000000-0000-4000-8000-000000000000'
-                  />
-                </div>
-                <div className='space-y-2'>
-                  <Label htmlFor='plain-code'>自定义明文码（可选）</Label>
-                  <Input
-                    id='plain-code'
-                    value={plainCode}
-                    onChange={(event) => setPlainCode(event.target.value)}
-                    placeholder='不填则由服务端随机生成'
-                  />
-                </div>
-                <Button disabled={loading}>
-                  {loading ? <Loader2 className='animate-spin' /> : <Ticket />}
-                  生成兑换码
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className='grid gap-4 lg:grid-cols-2'>
-          <ResultCard
-            title='最近创建的权益'
-            empty='创建权益后会显示 entitlementId 与 contentId。'
-            rows={
-              createdEntitlement
-                ? [
-                    ['entitlementId', createdEntitlement.entitlementId],
-                    ['contentId', createdEntitlement.contentId],
-                  ]
-                : []
-            }
-          />
-          <ResultCard
-            title='最近生成的兑换码'
-            empty='生成后请立即复制 plainCode，服务端不会再次返回明文。'
-            rows={
-              createdCode
-                ? [
-                    ['redemptionCodeId', createdCode.redemptionCodeId],
-                    ['plainCode', createdCode.plainCode],
-                  ]
-                : []
-            }
-          />
-        </div>
-      </Main>
-    </>
+      <div className='grid gap-4 lg:grid-cols-2'>
+        <ResultCard
+          title='最近创建的权益与兑换码'
+          empty='提交左侧表单后会显示 entitlementId、contentId、redemptionCodeId 与一次性 plainCode。'
+          rows={
+            createdEntitlement
+              ? [
+                  ['entitlementId', createdEntitlement.entitlementId],
+                  ['contentId', createdEntitlement.contentId],
+                  ['redemptionCodeId', createdEntitlement.redemptionCodeId],
+                  ['plainCode', createdEntitlement.plainCode],
+                ]
+              : []
+          }
+        />
+        <ResultCard
+          title='最近生成的兑换码'
+          empty='生成后请立即复制 plainCode，服务端不会再次返回明文。'
+          rows={
+            createdCode
+              ? [
+                  ['redemptionCodeId', createdCode.redemptionCodeId],
+                  ['plainCode', createdCode.plainCode],
+                ]
+              : []
+          }
+        />
+      </div>
+    </Main>
   )
 }
 
@@ -227,17 +215,11 @@ function ResultCard({
               <div className='w-32 shrink-0 text-sm text-muted-foreground'>
                 {label}
               </div>
-              <code className='min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs'>
-                {value}
-              </code>
-              <Button
-                variant='outline'
-                size='icon'
-                onClick={() => void copy(value)}
-                aria-label={`复制 ${label}`}
-              >
-                <Copy />
-              </Button>
+              <CopyableTextButton
+                value={value}
+                copyLabel={`点击复制${label}`}
+                className='min-w-0 flex-1 rounded bg-muted px-2 py-1 text-left font-mono text-xs break-all'
+              />
             </div>
           ))
         ) : (
@@ -248,11 +230,6 @@ function ResultCard({
       </CardContent>
     </Card>
   )
-}
-
-async function copy(value: string) {
-  await navigator.clipboard.writeText(value)
-  toast.success('已复制')
 }
 
 function toMessage(err: unknown): string {

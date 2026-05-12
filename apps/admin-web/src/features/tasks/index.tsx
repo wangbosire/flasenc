@@ -29,11 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
 
 const PAGE_SIZE = 10
 const TRANSFER_PAGE_SIZE = 10
@@ -124,24 +120,13 @@ export function Tasks() {
     actionMutation.isPending
 
   return (
-    <>
-      <Header fixed>
-        <div className='me-auto'>
-          <h1 className='text-lg font-semibold'>内容复核</h1>
+    <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+      <div className='flex flex-wrap items-end justify-between gap-3'>
+        <div>
+          <p className='text-muted-foreground'>
+            处理疑似已发布内容、平台下架/隐藏，并查询内容转让记录。
+          </p>
         </div>
-        <ThemeSwitch />
-        <ConfigDrawer />
-        <ProfileDropdown />
-      </Header>
-
-      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='flex flex-wrap items-end justify-between gap-3'>
-          <div>
-            <h2 className='text-2xl font-bold tracking-tight'>疑似内容队列</h2>
-            <p className='text-muted-foreground'>
-              处理疑似已发布内容、平台下架/隐藏，并查询内容转让记录。
-            </p>
-          </div>
           <Button
             variant='outline'
             onClick={() => void queueQuery.refetch()}
@@ -374,7 +359,6 @@ export function Tasks() {
           </Card>
         </div>
       </Main>
-    </>
   )
 }
 
