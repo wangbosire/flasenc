@@ -1,9 +1,11 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -15,16 +17,44 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { ContentListingState, ContentPublishStatus } from '@prisma/client';
 import { OffsetPageQueryDto } from '@app/http';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import type { AdminAuthedRequest } from '../auth/admin-jwt-auth.guard';
 import { AdminJwtAuthGuard } from '../auth/admin-jwt-auth.guard';
+import { AdminContentListQueryDto } from './admin-content-list-query.dto';
 import {
   PlatformContentsService,
   type AdminContentTransferRecordsResultDto,
   type PlatformContentAdminDetailDto,
+  type PlatformContentListResultDto,
   type PlatformContentListingDto,
   type SuspiciousPublishedQueueResultDto,
 } from './platform-contents.service';
+
+/** 管理端编辑内容权限字段：发布状态与上架态均为可选，但至少传一项。 */
+const updateContentPermissionBodySchema = z
+  .object({
+    publishStatus: z
+      .nativeEnum(ContentPublishStatus)
+      .optional()
+      .describe('内容发布状态；影响机审/发布流程。'),
+    listingState: z
+      .nativeEnum(ContentListingState)
+      .optional()
+      .describe('内容上架态；影响访客可见性。'),
+  })
+  .refine(
+    (body) =>
+      body.publishStatus !== undefined || body.listingState !== undefined,
+    { message: '至少需要更新一个权限字段' },
+  );
+
+/** DTO：管理端编辑内容权限字段。 */
+class UpdateContentPermissionBodyDto extends createZodDto(
+  updateContentPermissionBodySchema,
+) {}
 
 /**
  * 平台侧内容运营接口：读队列/详情/转让记录；写处置动作（下架、隐藏、疑似结论等）。
@@ -39,6 +69,18 @@ import {
 @ApiBearerAuth('bearer')
 export class PlatformContentsController {
   constructor(private readonly platformContents: PlatformContentsService) {}
+
+  /** 管理端全量内容列表；不经 C 端访客/Owner 可见性过滤。 */
+  @Get()
+  @ApiOperation({ summary: '管理端内容列表（分页 + 可选筛选）' })
+  /**
+   * @param query 分页 `page`/`pageSize`；可选 `contentId`、`publishStatus`、`listingState`、`placeholderKind`、`ownerMemberId`、`entitlementId`、`titleContains`、时间范围、`hasEntitlement`、`hasOwner`、兑换码相关筛选（AND）。
+   */
+  listForAdmin(
+    @Query() query: AdminContentListQueryDto,
+  ): Promise<PlatformContentListResultDto> {
+    return this.platformContents.listForAdmin(query);
+  }
 
   /** 列出当前为「疑似已发布」的内容，供人工队列处理。 */
   @Get('queues/suspicious')
@@ -96,6 +138,40 @@ export class PlatformContentsController {
     @Req() req: AdminAuthedRequest,
   ): Promise<PlatformContentListingDto> {
     return this.platformContents.restorePublicListing(contentId, req.userId);
+  }
+
+  /** 管理端直接编辑内容发布/上架权限字段。 */
+  @Patch(':contentId/permissions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '编辑内容权限字段（发布态/上架态）' })
+  @ApiParam({ name: 'contentId', description: '内容 UUID' })
+  /**
+   * @param contentId 目标内容 id。
+   * @param req 操作者平台用户。
+   * @param body 要更新的权限字段。
+   */
+  updatePermission(
+    @Param('contentId') contentId: string,
+    @Req() req: AdminAuthedRequest,
+    @Body() body: UpdateContentPermissionBodyDto,
+  ): Promise<PlatformContentListingDto> {
+    return this.platformContents.updatePermission(contentId, req.userId, body);
+  }
+
+  /** 管理员直接发起内容审核：进入 `SUBMITTED` 并创建机审任务。 */
+  @Post(':contentId/actions/submit-moderation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '管理员发起内容审核' })
+  @ApiParam({ name: 'contentId', description: '内容 UUID' })
+  /**
+   * @param contentId 目标内容 id。
+   * @param req 操作者平台用户。
+   */
+  submitModeration(
+    @Param('contentId') contentId: string,
+    @Req() req: AdminAuthedRequest,
+  ): Promise<PlatformContentListingDto> {
+    return this.platformContents.submitModeration(contentId, req.userId);
   }
 
   /** 人工确认「无问题」：疑似已发布 → 正常已发布，同事务写审计。 */

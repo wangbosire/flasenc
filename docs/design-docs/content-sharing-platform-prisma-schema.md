@@ -30,6 +30,8 @@ erDiagram
   User ||--o{ ContentEntitlement : creates_entitlement
   User ||--o{ AuditLog : acts_as_platform
 
+  AdminMenuItem ||--o{ AdminMenuItem : parent_child
+
   MemberUser ||--o{ Content : owns
   MemberUser ||--o{ Comment : writes
   MemberUser ||--o{ RedemptionCode : redeems
@@ -65,6 +67,20 @@ erDiagram
 | `id` | 管理端 JWT `sub`；`content_entitlements.created_by_user_id`、审计 `actor_user_id`。 |
 | `email` / `passwordHash` | 管理端登录（bcrypt）。 |
 | `platformAdmin` | `true` 可走管理端登录与写接口；完整 RBAC 前由该字段门控。 |
+
+### `admin_menu_items`（`AdminMenuItem`）— 管理后台菜单
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 菜单项主键。 |
+| `parentId` | 自关联父级；`null` 表示侧栏分组。 |
+| `title` | 菜单展示标题。 |
+| `routePath` | 菜单链接；分组/折叠项为 `null`，叶子项可填站内路径或外链；唯一约束避免同一链接配置多次。 |
+| `iconKey` | 前端 lucide 图标映射键；服务端不存组件引用。 |
+| `sortOrder` | 同级排序，越小越靠前。 |
+| `enabled` | 是否出现在侧栏树接口；禁用节点及其子树不返回。 |
+
+**层级不变量**：根节点为分组；二级可为链接或折叠项；三级必须绑定 `routePath`；带链接的节点不得拥有子菜单。该约束由 `MenuItemsService` 维护，数据库仅保存自关联结构。
 
 ### `member_users`（`MemberUser`）— C 端
 
@@ -154,3 +170,4 @@ pnpm run db:migrate:deploy # 空库 / CI / 生产：仅应用已有 migrations
 | 2026-05-11 | 首版：业务表、枚举、ER 图与索引说明 |
 | 2026-05-12 | 拆分 `User` / `MemberUser`；C 端字段与关系迁至 `member_users`；**`MemberUser.displayName`** |
 | 2026-05-12 | MySQL **列名**统一为 **`snake_case`**（Prisma `@map`）；重写 **`20260512100000_init`** DDL |
+| 2026-05-13 | 新增 `admin_menu_items` 管理后台菜单模型；支持动态侧栏、命令面板与自定义站内/外部链接 |

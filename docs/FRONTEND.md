@@ -57,18 +57,31 @@
 - 可组合逻辑用 **自定义 Hook**（`use*`），命名以领域含义为准。
 - **先看依赖再开发**：开发新功能前先检查 `apps/admin-web/package.json` 与既有 `src/` 用法；优先复用已安装的 TanStack、shadcn/ui、Radix、react-hook-form、zod、sonner、Zustand、lucide-react 等能力，避免重复造轮子。
 - **状态**：局部表单草稿用 `useState` 或 react-hook-form；跨布局 / 路由共享用 Zustand；服务端状态必须优先用 **TanStack Query**（`useQuery` / `useMutation` / `invalidateQueries`），避免在业务组件中手写加载、缓存、重试与刷新逻辑。
-- **路由**：新增页面优先使用 `src/routes/` 文件路由，并同步侧边栏配置。
+- **路由**：新增页面优先使用 `src/routes/` 文件路由；是否出现在后台侧栏由菜单管理配置决定，不再直接把路由文件等同于导航入口。
 
-### 2.4 样式
+### 2.4 管理后台菜单
+
+- **数据源**：`apps/admin-web` 的侧栏与命令面板优先读取管理端接口 **`GET /admin/v1/menu-items/tree`**；接口失败或返回空菜单时使用 `src/components/layout/data/sidebar-data.ts` 作为兜底。
+- **映射层**：服务端只返回可序列化字段（如 `title`、`routePath`、`iconKey`、`sortOrder`、`enabled`、`parentId`）；前端在 `src/lib/admin-menu-map.ts` 转换为现有 `SidebarData`，并在 `src/lib/admin-menu-icons.ts` 将 `iconKey` 映射为 lucide 组件。
+- **链接策略**：菜单链接允许填写站内路径或外链；站内路径走 TanStack Router `Link` / `navigate`，外链由 `src/lib/admin-menu-links.ts` 识别并以新标签打开。`src/lib/registered-admin-routes.ts` 仅作为菜单表单输入建议，不是校验白名单。
+- **菜单管理页**：`/system/menus` 提供创建、编辑、启停、删除、同级排序；变更成功后须同时刷新菜单列表 query 与侧栏树 query，确保侧栏和命令面板同步。
+
+### 2.5 内容与兑换码页面
+
+- **内容列表**：`/contents` 使用 **`GET /admin/v1/contents`**，展示内容、发布态、上架态、权益 id、兑换码数量和最近兑换码记录；列表只复制记录 id，明文 `plainCode` 仅能在生成页响应中复制。
+- **内容操作**：内容列表提供权限编辑（`publishStatus` / `listingState`）和发起审核操作；成功后须刷新 `['admin', 'contents']` 相关 query。
+- **生成兑换码**：`/redemption-codes` 使用 **`POST /admin/v1/content-entitlements/redemption-codes`**，一次提交创建内容、权益和兑换码；`plainCode` 只在本次响应展示，页面须便于复制。
+
+### 2.6 样式
 
 - 优先 **shadcn/ui 组件 + Tailwind 工具类**；全局样式集中在 `src/styles/`。
 - 设计令牌以 shadcn/ui CSS 变量为准；避免在业务组件内复制魔法色值。
 
-### 2.5 与 `packages/ui`
+### 2.7 与 `packages/ui`
 
 - 复用 **`@repo/ui`** 时仅使用其 **公开 exports**；需要新通用组件时优先提到 `packages/ui` 再在各端引用。
 
-### 2.6 命令
+### 2.8 命令
 
 见 [`references/repo-commands-llms.txt`](references/repo-commands-llms.txt) 中 `--filter @flasenc/admin-web`。
 

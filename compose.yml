@@ -13,6 +13,7 @@ services:
       JWT_REFRESH_SECRET: change-me-to-another-long-random-string-at-least-32-chars
       ADMIN_PROXY_TARGET: http://127.0.0.1:3001
       CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
       WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"

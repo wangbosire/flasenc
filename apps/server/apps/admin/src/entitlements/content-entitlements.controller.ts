@@ -31,9 +31,26 @@ const createEntitlementBodySchema = z.object({
 
 /**
  * 生成兑换码时可选自定义明文；不传则服务端随机生成。
- * 响应体中的 `plainCode` **仅出现一次**，落库仅存 hash。
+ * 响应体中的 `plainCode` **仅创建响应强调复制**；库内 **`plain_code`（明文）与 `code_hash`（摘要）同事务写入**，兑换优先按明文列匹配。
  */
 const createRedemptionCodeBodySchema = z.object({
+  plainCode: z
+    .string()
+    .min(4)
+    .max(128)
+    .optional()
+    .describe('自定义明文码；不传则服务端随机生成，仅响应出现一次。'),
+});
+
+/**
+ * 生成兑换码主路径：同时创建占位内容与权益，避免前端两步调用产生半完成数据。
+ */
+const createRedemptionCodeWithContentBodySchema = z.object({
+  title: z
+    .string()
+    .max(512)
+    .optional()
+    .describe('占位内容可选标题；不传则内容标题为空。'),
   plainCode: z
     .string()
     .min(4)
@@ -52,6 +69,11 @@ class CreateRedemptionCodeBodyDto extends createZodDto(
   createRedemptionCodeBodySchema,
 ) {}
 
+/** DTO：创建占位内容、权益并立即生成兑换码。 */
+class CreateRedemptionCodeWithContentBodyDto extends createZodDto(
+  createRedemptionCodeWithContentBodySchema,
+) {}
+
 /**
  * 权益与兑换码：**写操作**全程须 {@link AdminJwtAuthGuard}；`createdByUserId` 取自 JWT `sub`。
  */
@@ -65,11 +87,14 @@ export class ContentEntitlementsController {
   ) {}
 
   /**
-   * 事务内创建 `ContentEntitlement` + 占位 `Content`；审计与幂等规则见 Service。
+   * 事务内创建占位 `Content`、`ContentEntitlement` 与 **唯一一条** `RedemptionCode`；
+   * 明文仅响应一次（与同应用的 **`POST …/redemption-codes`** 一体化接口一致）。
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '创建权益并生成占位内容' })
+  @ApiOperation({
+    summary: '创建权益、占位内容并生成兑换码（响应含一次性明文）',
+  })
   /**
    * @param req 管理端用户；`userId` 写入审计。
    * @param body 可选占位标题等。
@@ -77,8 +102,38 @@ export class ContentEntitlementsController {
   create(
     @Req() req: AdminAuthedRequest,
     @Body() body: CreateEntitlementBodyDto,
-  ): Promise<{ entitlementId: string; contentId: string }> {
+  ): Promise<{
+    entitlementId: string;
+    contentId: string;
+    redemptionCodeId: string;
+    plainCode: string;
+  }> {
     return this.contentEntitlementsService.createEntitlementWithPlaceholder(
+      body,
+      req.userId,
+    );
+  }
+
+  /**
+   * 一体化生成兑换码：同事务创建占位 Content、ContentEntitlement 与 RedemptionCode。
+   */
+  @Post('redemption-codes')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: '创建内容、权益并生成兑换码（响应含一次性明文）' })
+  /**
+   * @param req 管理端用户；`userId` 写入权益与兑换码审计。
+   * @param body 可选内容标题和自定义明文码。
+   */
+  createRedemptionCodeWithContent(
+    @Req() req: AdminAuthedRequest,
+    @Body() body: CreateRedemptionCodeWithContentBodyDto,
+  ): Promise<{
+    entitlementId: string;
+    contentId: string;
+    redemptionCodeId: string;
+    plainCode: string;
+  }> {
+    return this.contentEntitlementsService.createRedemptionCodeWithContent(
       body,
       req.userId,
     );

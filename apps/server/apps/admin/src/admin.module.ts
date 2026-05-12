@@ -10,6 +10,8 @@ import { PlatformContentsController } from './contents/platform-contents.control
 import { PlatformContentsService } from './contents/platform-contents.service';
 import { ContentEntitlementsController } from './entitlements/content-entitlements.controller';
 import { ContentEntitlementsService } from './entitlements/content-entitlements.service';
+import { MenuItemsController } from './menu/menu-items.controller';
+import { MenuItemsService } from './menu/menu-items.service';
 
 @Module({
   imports: [DatabaseModule, HttpCoreModule, AdminAuthModule],
@@ -18,12 +20,14 @@ import { ContentEntitlementsService } from './entitlements/content-entitlements.
     ContentEntitlementsController,
     PlatformContentsController,
     AuditLogsController,
+    MenuItemsController,
   ],
   providers: [
     AdminService,
     ContentEntitlementsService,
     PlatformContentsService,
     AuditLogsService,
+    MenuItemsService,
   ],
 })
 export class AdminModule {}

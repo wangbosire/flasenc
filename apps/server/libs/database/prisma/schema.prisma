@@ -41,6 +41,35 @@ model User {
 }
 
 // ---------------------------------------------------------------------------
+// 管理端菜单
+// ---------------------------------------------------------------------------
+
+/// 管理端可配置菜单项：根节点为菜单分组，二级可为链接或折叠项，三级必须为具体路由链接。
+model AdminMenuItem {
+  id        String          @id @default(uuid()) @db.Char(36)
+  /// 父级菜单；为空表示侧栏分组。
+  parentId  String?         @map("parent_id") @db.Char(36)
+  parent    AdminMenuItem?  @relation("AdminMenuTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  AdminMenuItem[] @relation("AdminMenuTree")
+  /// 展示标题。
+  title     String          @db.VarChar(64)
+  /// 菜单链接；根分组和折叠项为空，可为站内路径或外链。
+  routePath String?         @unique @map("route_path") @db.VarChar(512)
+  /// 前端图标映射键；服务端不存组件引用。
+  iconKey   String?         @map("icon_key") @db.VarChar(64)
+  /// 同级排序，越小越靠前。
+  sortOrder Int             @default(0) @map("sort_order")
+  /// 是否启用；禁用节点及其子树不会出现在侧栏树接口。
+  enabled   Boolean         @default(true)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@index([parentId, sortOrder])
+  @@index([enabled, sortOrder])
+  @@map("admin_menu_items")
+}
+
+// ---------------------------------------------------------------------------
 // C 端会员（`member_users`）
 // ---------------------------------------------------------------------------
 
@@ -90,6 +119,7 @@ model ContentEntitlement {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
+  /// 兑换码实例；产品与兑换链路约定 **每条权益至多一条**（重复发码返回 `CONTENT_REDEMPTION_CODE_ALREADY_ISSUED`）。
   redemptionCodes RedemptionCode[]
 
   @@index([createdByUserId])
@@ -104,14 +134,16 @@ enum EntitlementStatus {
   ARCHIVED
 }
 
-/// 一条兑换码实例：明文仅存响应一次，库内仅 `codeHash`。
+/// 一条兑换码实例：**运营与用户兑换均以明文 `plain_code` 为业务真源**（C 端输入与库内列精确匹配）；`code_hash` 为 SHA-256 摘要，用于入库唯一约束及 **`plain_code` 为空的历史行** 兑换兜底（单方哈希不可逆，并非对称加密）。
 model RedemptionCode {
   id                 String               @id @default(uuid()) @db.Char(36)
   /// 所属权益。
   entitlementId      String               @map("entitlement_id") @db.Char(36)
   entitlement        ContentEntitlement   @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
-  /// 明文兑换码的 hash（算法与 `libs/shared` 一致）；唯一约束支撑「一码一用」抢码更新。
+  /// 明文 SHA-256 摘要（hex）；新发码仍写入，兼容唯一校验与旧数据兑换路径。
   codeHash           String               @unique @map("code_hash") @db.VarChar(128)
+  /// C 端兑换输入明文；管理端列表只读本列。**不得**将明文写入审计 payload。
+  plainCode          String?              @map("plain_code") @db.VarChar(128)
   /// 有效 / 作废 / 已兑换；与兑换事务、失败审计配合。
   status             RedemptionCodeStatus @default(ACTIVE)
   /// 运营手动作废时间。
@@ -125,6 +157,7 @@ model RedemptionCode {
   updatedAt          DateTime             @updatedAt @map("updated_at")
 
   @@index([entitlementId])
+  @@index([plainCode])
   @@index([status])
   @@map("redemption_codes")
 }

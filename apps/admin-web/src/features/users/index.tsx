@@ -23,11 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { ThemeSwitch } from '@/components/theme-switch'
 
 const PAGE_SIZE = 20
 
@@ -69,24 +65,13 @@ export function Users() {
   const totalPages = Math.max(1, Math.ceil((logs?.total ?? 0) / PAGE_SIZE))
 
   return (
-    <>
-      <Header fixed>
-        <div className='me-auto'>
-          <h1 className='text-lg font-semibold'>审计日志</h1>
+    <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
+      <div className='flex flex-wrap items-end justify-between gap-3'>
+        <div>
+          <p className='text-muted-foreground'>
+            查询平台操作、内容处置、权益创建和兑换码生成等审计记录。
+          </p>
         </div>
-        <ThemeSwitch />
-        <ConfigDrawer />
-        <ProfileDropdown />
-      </Header>
-
-      <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
-        <div className='flex flex-wrap items-end justify-between gap-3'>
-          <div>
-            <h2 className='text-2xl font-bold tracking-tight'>审计与追踪</h2>
-            <p className='text-muted-foreground'>
-              查询平台操作、内容处置、权益创建和兑换码生成等审计记录。
-            </p>
-          </div>
           <Button
             variant='outline'
             onClick={() => void logsQuery.refetch()}
@@ -245,7 +230,6 @@ export function Users() {
           </CardContent>
         </Card>
       </Main>
-    </>
   )
 }
 
