@@ -1,14 +1,16 @@
-# 文档（MVP 1.0）
+# 文档入口
 
-与根目录 [`AGENTS.md`](../AGENTS.md) 配合：**Harness** 思路下，**[`MVP.md`](./MVP.md)** 为文档第一版的范围与索引真源；本页仅保留最短导航。
+先读 [**MVP.md**](./MVP.md)。它负责回答“我现在到底该看哪几篇”，并把其它文档分成日常必读、按任务下钻、参考模板三层。
 
-| 优先级 | 文档 |
-|--------|------|
-| **先读** | [**MVP.md**](./MVP.md)（必读/扩展分层与版本策略） |
-| 流程 | [development-lifecycle.md](./development-lifecycle.md) |
-| API | [api/http-api-specification.md](./api/http-api-specification.md) |
-| 规范 | [FRONTEND.md](./FRONTEND.md)、[BACKEND.md](./BACKEND.md)、[SECURITY.md](./SECURITY.md) |
-| 发布 | [runbook/release-checklist.md](./runbook/release-checklist.md) |
-| 速查 | [references/repo-commands-llms.txt](./references/repo-commands-llms.txt) |
+常用直达：
 
-**子目录**：[`design-docs/`](./design-docs/index.md) · [`product-specs/`](./product-specs/index.md) · [`exec-plans/`](./exec-plans/active/README.md) · [`generated/`](./generated/) · [`references/`](./references/README.md)
+| 目的 | 文档 |
+|------|------|
+| 命令 | [`references/repo-commands-llms.txt`](./references/repo-commands-llms.txt) |
+| API 契约 | [`api/http-api-specification.md`](./api/http-api-specification.md) |
+| 前端 / 后端规范 | [`FRONTEND.md`](./FRONTEND.md) / [`BACKEND.md`](./BACKEND.md) |
+| 产品需求 | [`product-specs/content-sharing-platform.md`](./product-specs/content-sharing-platform.md) |
+| 技术方案 | [`design-docs/index.md`](./design-docs/index.md) |
+| 发布检查 | [`runbook/release-checklist.md`](./runbook/release-checklist.md) |
+
+维护原则：新增文档前先看是否能补进已有真源；确需新增时，同步更新 [`MVP.md`](./MVP.md) 的分层。

@@ -10,7 +10,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import type { AuthedRequest } from '../auth/jwt-auth.guard';
@@ -31,10 +36,7 @@ const patchContentBodySchema = z
       .nullable()
       .optional()
       .describe('标题；可传 `null` 清空；与 `body` 至少填一项。'),
-    body: z
-      .unknown()
-      .optional()
-      .describe('正文 JSON；与 `title` 至少填一项。'),
+    body: z.unknown().optional().describe('正文 JSON；与 `title` 至少填一项。'),
   })
   .refine((v) => v.title !== undefined || v.body !== undefined, {
     message: '至少需要提供 title 或 body 之一',

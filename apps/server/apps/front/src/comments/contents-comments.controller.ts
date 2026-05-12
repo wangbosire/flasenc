@@ -10,7 +10,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { OffsetPageQueryDto, zUuidChar36Optional } from '@app/http';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
@@ -30,9 +35,7 @@ import {
  */
 const createCommentBodySchema = z
   .object({
-    body: z
-      .unknown()
-      .describe('评论正文 JSON（块结构等与客户端契约一致）。'),
+    body: z.unknown().describe('评论正文 JSON（块结构等与客户端契约一致）。'),
     anchorId: zUuidChar36Optional().describe(
       '对话锚点根评论 id；顶层根评论可省略。',
     ),

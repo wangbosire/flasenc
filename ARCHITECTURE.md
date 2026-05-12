@@ -6,7 +6,7 @@
 
 | 路径 | 包名 | 职责 |
 |------|------|------|
-| `apps/admin-web/` | `@flasenc/admin-web` | 管理后台：React 19 + Rsbuild + Tailwind；`dev` / `build` / `lint` / `test` 接入 turbo。 |
+| `apps/admin-web/` | `@flasenc/admin-web` | 管理后台：React 19 + Vite + TanStack Router + shadcn/ui；基于 `satnaing/shadcn-admin` 改造，`dev` / `build` / `lint` / `test` 接入 turbo。 |
 | `apps/mobile/` | `@flasenc/mobile` | 客户端：uni-app（Vue 3）多端（H5 / 各小程序等）；平台脚本为 `dev:*` / `build:*`，类型检查为 `type-check`。 |
 | `apps/server/` | `@flasenc/server` | 后端：NestJS；`dev`（watch）、`build`、`lint`、`test` / `test:e2e` 接入 turbo；`check-types` 为 `tsc --noEmit`。 |
 | `packages/ui/` | `@repo/ui` | 共享 React 组件库；供 Web 侧复用；`lint`、`check-types`。 |

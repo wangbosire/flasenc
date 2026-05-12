@@ -8,17 +8,17 @@ pnpm install
 pnpm dev              # turbo run dev — 对有 dev 脚本的 workspace 并行（含 @flasenc/admin-web、@flasenc/server）
 pnpm build            # turbo run build
 pnpm lint             # turbo run lint
-pnpm check-types      # turbo run check-types（含 @repo/ui、@flasenc/server；不含 @flasenc/mobile）
+pnpm check-types      # turbo run check-types（含 @repo/ui、@flasenc/server、@flasenc/mobile）
 pnpm format           # Prettier（根脚本；范围见 package.json）
 
 ## 按应用过滤（推荐日常开发）
 
-# 管理后台 React + Rsbuild
+# 管理后台 React + Vite + shadcn/ui（Node >= 20.19；本机可用 `fnm exec --using v22.20.0 ...`）
 pnpm --filter @flasenc/admin-web dev
 pnpm --filter @flasenc/admin-web build
+pnpm --filter @flasenc/admin-web run check-types
 pnpm --filter @flasenc/admin-web lint
 pnpm --filter @flasenc/admin-web test
-pnpm --filter @flasenc/admin-web run check   # Biome check --write
 
 # 后端 NestJS（dev 即 nest start --watch；另保留 start:dev 脚本名）
 pnpm --filter @flasenc/server dev
@@ -26,14 +26,17 @@ pnpm --filter @flasenc/server build
 pnpm --filter @flasenc/server lint
 pnpm --filter @flasenc/server test
 pnpm --filter @flasenc/server run test:e2e
-# E2E 需本机 MySQL（库 flasenc，见 apps/server/.env.example）；日常开发不要求 Docker
+# E2E 需本机 MySQL（库 flasenc，DATABASE_URL 见 apps/server/.env.example）；本地标准路径零 Docker 依赖
 pnpm --filter @flasenc/server run check-types
 pnpm --filter @flasenc/server run db:test-connection   # 本机 MySQL 连通性（见 BACKEND §1.1）
+pnpm --filter @flasenc/server run db:migrate:deploy    # 空库 / 新环境应用已版本化迁移
+pnpm --filter @flasenc/server run db:seed:admin         # 本地管理账号 admin@example.com / admin123..
 
-# 移动端 uni-app（脚本名带平台后缀；未接入根 turbo dev/lint）
+# 移动端 uni-app（脚本名带平台后缀；check-types 已接入根 turbo）
 pnpm --filter @flasenc/mobile run dev:h5
 pnpm --filter @flasenc/mobile run build:h5
-pnpm --filter @flasenc/mobile run type-check
+pnpm --filter @flasenc/mobile run check-types
+pnpm --filter @flasenc/mobile run type-check     # check-types 的兼容别名
 
 ## 共享包
 
@@ -42,6 +45,6 @@ pnpm --filter @repo/ui run check-types
 
 ## 说明
 
-- `@flasenc/mobile` 使用 `type-check`（vue-tsc），与根 `check-types` 任务名不同；全仓 `pnpm check-types` 不会覆盖 mobile，改 mobile 后请单独跑对应命令。
+- `@flasenc/mobile` 使用 `check-types`（vue-tsc），`type-check` 保留为兼容别名；全仓 `pnpm check-types` 会覆盖 mobile。
 - 根 `pnpm dev` 会并行拉起所有带 `dev` 的 workspace（含 admin-web 与 server）；若只需其一，用 `--filter`。
 - `@flasenc/server` 的 `format` 脚本当前路径指向仓库内 `apps/**/*.ts` 等，若在 monorepo 根执行需注意工作目录；建议在 `apps/server` 目录下执行或后续改为仅格式化 `apps/server`。

@@ -1,38 +1,46 @@
-# 文档第一版（MVP）
+# MVP 文档地图
 
-本页为仓库**文档体系的唯一版本声明**：**MVP 1.0**。以下路径为协作真源；未列出的专题文档视为**扩展材料**，不阻塞发版与联调。
+本页是仓库文档的**唯一入口与分层声明**。目标是少读、读对：日常开发先看最短路径，只有改到对应领域时再下钻专题文档。
 
-## 1. 必读（MVP）
+本仓库仍按 **Harness Engineering** 工作：**人类掌舵范围与风险，智能体在门禁内执行**；结论、评审、发布检查、风险取舍必须进入版本化记录（文档、Issue 或 PR），口头约定不作为真源。
 
-| 用途 | 路径 |
+## 1. 最短路径
+
+日常任务默认只读这些入口：
+
+| 何时读 | 文档 |
+|--------|------|
+| 进入仓库、确认边界 | [`AGENTS.md`](../AGENTS.md) + [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
+| 写代码、跑命令 | [`references/repo-commands-llms.txt`](./references/repo-commands-llms.txt) |
+| 需要协作流程 / 记录口径 | [`development-lifecycle.md`](./development-lifecycle.md) |
+| 改接口或联调 | [`api/http-api-specification.md`](./api/http-api-specification.md) |
+| 改具体端 | 前端读 [`FRONTEND.md`](./FRONTEND.md)，后端读 [`BACKEND.md`](./BACKEND.md) |
+
+## 2. 按任务下钻
+
+| 任务 | 只在需要时阅读 |
+|------|----------------|
+| 理解产品范围 / 验收 | [`product-specs/content-sharing-platform.md`](./product-specs/content-sharing-platform.md) |
+| 理解技术方案 / 数据模型 | [`design-docs/index.md`](./design-docs/index.md) |
+| 做安全、密钥、脱敏改动 | [`SECURITY.md`](./SECURITY.md) |
+| 做发布、回滚、线上验证 | [`runbook/release-checklist.md`](./runbook/release-checklist.md)、[`RELIABILITY.md`](./RELIABILITY.md) |
+| 拆任务、记录技术债 | [`exec-plans/`](./exec-plans/active/README.md)、[`exec-plans/tech-debt-tracker.md`](./exec-plans/tech-debt-tracker.md) |
+| 需要更细流程模板 | [`development-lifecycle.md`](./development-lifecycle.md) |
+
+## 3. 参考与模板
+
+这些文档不阻塞日常开发；只有被任务点名或需要模板时再看。
+
+| 类别 | 文档 |
 |------|------|
-| 应用与包、硬约束、CI | 根目录 [`AGENTS.md`](../AGENTS.md) |
-| Monorepo 边界与分层 | 根目录 [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
-| 需求→上线的最小流程 | [`development-lifecycle.md`](./development-lifecycle.md) |
-| HTTP 信封、版本前缀、`error.code`、接口清单 | [`api/http-api-specification.md`](./api/http-api-specification.md) |
-| 前端规范 | [`FRONTEND.md`](./FRONTEND.md) |
-| 后端规范 | [`BACKEND.md`](./BACKEND.md) |
-| 安全摘要 | [`SECURITY.md`](./SECURITY.md) |
-| 发版自检 | [`runbook/release-checklist.md`](./runbook/release-checklist.md) |
-| 命令速查（人/智能体） | [`references/repo-commands-llms.txt`](./references/repo-commands-llms.txt) |
+| 工程原则补充 | [`DESIGN.md`](./DESIGN.md)、[`QUALITY_SCORE.md`](./QUALITY_SCORE.md)、[`PRODUCT_SENSE.md`](./PRODUCT_SENSE.md) |
+| 新需求模板 / 评审包 | [`product-specs/index.md`](./product-specs/index.md) |
+| 外部工具参考 | [`references/`](./references/README.md) |
+| 自动生成，勿手改 | [`generated/`](./generated/) |
 
-## 2. 扩展（按需阅读）
+## 4. 防止文档继续膨胀
 
-| 用途 | 路径 |
-|------|------|
-| 工程与设计原则（补充） | [`DESIGN.md`](./DESIGN.md) |
-| 可观测 / SLO 模板 | [`RELIABILITY.md`](./RELIABILITY.md) |
-| 质量与测试 | [`QUALITY_SCORE.md`](./QUALITY_SCORE.md) |
-| 产品原则（占位级） | [`PRODUCT_SENSE.md`](./PRODUCT_SENSE.md) |
-| 内容分享平台：需求（合订）/ 技术方案 / Prisma | [`product-specs/content-sharing-platform.md`](./product-specs/content-sharing-platform.md)、[`design-docs/`](./design-docs/index.md) |
-| 执行计划与技术债 | [`exec-plans/`](./exec-plans/active/README.md)、[`exec-plans/tech-debt-tracker.md`](./exec-plans/tech-debt-tracker.md) |
-| 工具生成物（勿手改） | [`generated/`](./generated/) |
-
-## 3. 版本策略（MVP 之后）
-
-- **接口与契约**：以 [`api/http-api-specification.md`](./api/http-api-specification.md) 为准；破坏性变更须走评审，并在 PR 中写明迁移与客户端影响。
-- **不再维护**「逐条修订履历」长表；历史以 Git 为准。若需对外发布说明，在 PR 或 `PLANS.md` 中记一条即可。
-
-## 4. 与入口的关系
-
-- 根目录 [`README.md`](../README.md)（若存在）或本仓库约定：**智能体与人类**优先读 **`AGENTS.md`** + **`docs/MVP.md`**，再按需下钻。
+- 保持 Harness：重要决定必须可从仓库记录追溯到“谁拍板、为什么、如何验证”。
+- 新信息优先补进已有真源；不要为一句规则新增顶层文档。
+- 新文档必须在本页归类为“最短路径 / 按任务 / 参考与模板”之一。
+- 契约变更以 HTTP 规范为准；实现细节以代码和对应专题文档为准；历史修订以 Git 为准，不维护长修订表。

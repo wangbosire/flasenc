@@ -1,6 +1,6 @@
 # 进行中执行计划
 
-用于跨职能 **任务清单、模板、迭代勾选**；与 [`development-lifecycle.md`](../development-lifecycle.md) 配合。文档索引见 [`../MVP.md`](../MVP.md)。
+用于跨职能 **任务清单、模板、迭代勾选**；与 [`development-lifecycle.md`](../../development-lifecycle.md) 配合。文档索引见 [`../../MVP.md`](../../MVP.md)。
 
 ## 当前条目
 

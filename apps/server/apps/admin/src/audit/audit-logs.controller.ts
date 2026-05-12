@@ -43,11 +43,7 @@ const auditLogListQuerySchema = offsetPageQuerySchema.extend({
     .max(40)
     .optional()
     .describe('时间窗起点 ISO8601；与 `to` 成对使用更佳。'),
-  to: z
-    .string()
-    .max(40)
-    .optional()
-    .describe('时间窗终点 ISO8601。'),
+  to: z.string().max(40).optional().describe('时间窗终点 ISO8601。'),
 });
 
 /**

@@ -18,11 +18,7 @@ import { AuthService } from './auth.service';
 
 /** 注册：邮箱 + 密码；密码长度与产品一致，由 Zod 在边界截断非法输入。 */
 const registerBodySchema = z.object({
-  email: z
-    .string()
-    .email()
-    .max(320)
-    .describe('注册邮箱；与登录共用格式校验。'),
+  email: z.string().email().max(320).describe('注册邮箱；与登录共用格式校验。'),
   password: z
     .string()
     .min(8)
@@ -51,7 +47,9 @@ const wechatMiniProgramLoginBodySchema = z
       .string()
       .min(6)
       .max(256)
-      .describe('`wx.login` / `uni.login` 返回的一次性 `code`，用于换 openid。'),
+      .describe(
+        '`wx.login` / `uni.login` 返回的一次性 `code`，用于换 openid。',
+      ),
   })
   .strict();
 
@@ -140,9 +138,7 @@ export class AuthController {
   /**
    * @param body 邮箱与密码；成功返回 `memberId` 等基础资料（不含 token 时见 Service）。
    */
-  register(
-    @Body() body: RegisterBodyDto,
-  ): Promise<{
+  register(@Body() body: RegisterBodyDto): Promise<{
     memberId: string;
     email: string;
     displayName: string | null;

@@ -6,16 +6,8 @@ import { AdminAuthService } from './admin-auth.service';
 
 /** 平台用户（`users` 表）邮箱密码登录；须 `platformAdmin` 才发管理 token（见 Service）。 */
 const loginBodySchema = z.object({
-  email: z
-    .string()
-    .email()
-    .max(320)
-    .describe('平台用户登录邮箱。'),
-  password: z
-    .string()
-    .min(8)
-    .max(128)
-    .describe('登录密码。'),
+  email: z.string().email().max(320).describe('平台用户登录邮箱。'),
+  password: z.string().min(8).max(128).describe('登录密码。'),
 });
 
 /** 与 C 端 refresh 形状一致，但密钥与签发逻辑在 AdminAuthService 分离。 */

@@ -1,9 +1,9 @@
 /**
  * 单测 / E2E 未显式设置 `DATABASE_URL` 时的本地默认（本机 MySQL，默认端口 3306）。
- * 日常开发不要求 Docker；协作/生产请用环境变量或 `.env` 覆盖，勿提交含生产口令的 `.env`。
+ * 本机 root 口令与示例不一致时，须在 `apps/server/.env` 中配置 `DATABASE_URL`；不依赖 Docker。
  */
 process.env.DATABASE_URL ??=
-  'mysql://root:Root123..@127.0.0.1:3306/flasenc';
+  'mysql://root:root123..@127.0.0.1:3306/flasenc';
 
 /** 与 `AuthModule` / E2E 一致；生产须覆盖为强随机密钥。 */
 process.env.JWT_SECRET ??=

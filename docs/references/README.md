@@ -4,7 +4,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| [repo-commands-llms.txt](./repo-commands-llms.txt) | dev/test/lint 等（待与 package.json 对齐） |
+| [repo-commands-llms.txt](./repo-commands-llms.txt) | dev/test/lint/typecheck 等命令速查 |
 | [../api/README.md](../api/README.md) | HTTP API；[http-api-specification.md](../api/http-api-specification.md) |
 | [design-system-reference-llms.txt](./design-system-reference-llms.txt) | 设计系统（可选） |
 | [nixpacks-llms.txt](./nixpacks-llms.txt) | 构建部署（可选） |

@@ -24,6 +24,14 @@ type ApiFailure = {
   traceId: string;
 };
 
+function expectJsonRecord(
+  value: unknown,
+): asserts value is Record<string, unknown> {
+  expect(value).not.toBeNull();
+  expect(typeof value).toBe('object');
+  expect(Array.isArray(value)).toBe(false);
+}
+
 describe('Front API (e2e)', () => {
   let app: INestApplication;
 
@@ -889,13 +897,11 @@ describe('Front API (e2e)', () => {
         },
       });
       expect(notif).not.toBeNull();
-      expect(notif!.data).toEqual(
-        expect.objectContaining({
-          contentId,
-          entitlementId: expect.any(String),
-          redemptionCodeId: expect.any(String),
-        }),
-      );
+      const notificationData = notif!.data;
+      expectJsonRecord(notificationData);
+      expect(notificationData.contentId).toBe(contentId);
+      expect(typeof notificationData.entitlementId).toBe('string');
+      expect(typeof notificationData.redemptionCodeId).toBe('string');
     });
 
     it('channelInApp 为 false 时兑换成功但不写站内信', async () => {
