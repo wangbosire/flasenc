@@ -27,7 +27,7 @@ async function main() {
   loadDotEnv(path.join(__dirname, '..', '.env'));
 
   process.env.DATABASE_URL ??=
-    'mysql://root:root123..@127.0.0.1:3306/flasenc';
+    'mysql://root:root123..@127.0.0.1:3307/flasenc';
 
   const email = process.env.FLASENC_SEED_ADMIN_EMAIL ?? 'admin@example.com';
   const password = process.env.FLASENC_SEED_ADMIN_PASSWORD ?? 'admin123..';

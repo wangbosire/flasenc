@@ -1,0 +1,61 @@
+name: flasenc
+
+services:
+  flasenc:
+    container_name: flasenc
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: mysql://root:root123..@flasenc-mysql:3306/flasenc
+      JWT_SECRET: change-me-to-a-long-random-string-at-least-32-chars
+      JWT_REFRESH_SECRET: change-me-to-another-long-random-string-at-least-32-chars
+      ADMIN_PROXY_TARGET: http://127.0.0.1:3001
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+      - flasenc-node-modules:/workspace/node_modules
+      - flasenc-admin-web-node-modules:/workspace/apps/admin-web/node_modules
+      - flasenc-mobile-node-modules:/workspace/apps/mobile/node_modules
+      - flasenc-server-node-modules:/workspace/apps/server/node_modules
+      - flasenc-ui-node-modules:/workspace/packages/ui/node_modules
+      - flasenc-pnpm-store:/pnpm/store
+      - flasenc-turbo-cache:/workspace/.turbo
+    depends_on:
+      flasenc-mysql:
+        condition: service_healthy
+
+  flasenc-mysql:
+    container_name: flasenc-mysql
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root123..
+      MYSQL_DATABASE: flasenc
+    ports:
+      - "3307:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - flasenc-mysql-data:/var/lib/mysql
+
+volumes:
+  flasenc-node-modules:
+  flasenc-admin-web-node-modules:
+  flasenc-mobile-node-modules:
+  flasenc-server-node-modules:
+  flasenc-ui-node-modules:
+  flasenc-pnpm-store:
+  flasenc-turbo-cache:
+  flasenc-mysql-data:

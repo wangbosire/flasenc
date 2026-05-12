@@ -1,7 +1,6 @@
-# 【完全可选】本地标准开发路径：本机安装 MySQL + DATABASE_URL，不要求 Docker。
-# 本文件仅给「想用容器临时起 MySQL」的同学；未安装 Docker 请忽略，无需执行 pnpm db:compose:*。
-# 若使用本 compose，在 apps/server 执行：docker compose -f docker-compose.mysql.yml up -d
-# 并设置 DATABASE_URL=mysql://root:root123..@127.0.0.1:3307/flasenc（宿主映射 3307）。
+# 兼容入口：仅启动 MySQL。完整 Docker 开发请优先使用仓库根目录 `compose.yml`。
+# 若单独使用本文件，在 apps/server 执行：docker compose -f docker-compose.mysql.yml up -d
+# 宿主机连接串：DATABASE_URL=mysql://root:root123..@127.0.0.1:3307/flasenc
 services:
   mysql:
     image: mysql:8.4

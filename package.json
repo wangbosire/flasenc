@@ -4,6 +4,11 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "docker:dev": "docker compose up --build flasenc",
+    "docker:up": "docker compose up -d --build flasenc",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f flasenc",
+    "docker:shell": "docker compose exec flasenc bash",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
