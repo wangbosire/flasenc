@@ -1,177 +1,263 @@
-import { type ChangeEvent, useState } from 'react'
-import { getRouteApi } from '@tanstack/react-router'
-import { SlidersHorizontal, ArrowUpAZ, ArrowDownAZ } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { Copy, Loader2, Plus, Ticket } from 'lucide-react'
+import { toast } from 'sonner'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
+  createContentEntitlement,
+  createRedemptionCode,
+  type CreatedEntitlement,
+  type CreatedRedemptionCode,
+} from '@/api/content-entitlements'
+import { AdminApiError } from '@/api/http'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { apps } from './data/apps'
-
-const route = getRouteApi('/_authenticated/apps/')
-
-type AppType = 'all' | 'connected' | 'notConnected'
-
-const appText = new Map<AppType, string>([
-  ['all', 'All Apps'],
-  ['connected', 'Connected'],
-  ['notConnected', 'Not Connected'],
-])
 
 export function Apps() {
-  const {
-    filter = '',
-    type = 'all',
-    sort: initSort = 'asc',
-  } = route.useSearch()
-  const navigate = route.useNavigate()
+  const [title, setTitle] = useState('')
+  const [entitlementId, setEntitlementId] = useState('')
+  const [plainCode, setPlainCode] = useState('')
+  const [createdEntitlement, setCreatedEntitlement] =
+    useState<CreatedEntitlement | null>(null)
+  const [createdCode, setCreatedCode] = useState<CreatedRedemptionCode | null>(
+    null
+  )
+  const [error, setError] = useState<string | null>(null)
 
-  const [sort, setSort] = useState(initSort)
-  const [appType, setAppType] = useState(type)
-  const [searchTerm, setSearchTerm] = useState(filter)
+  const entitlementMutation = useMutation({
+    mutationFn: (nextTitle: string) =>
+      createContentEntitlement(nextTitle || undefined),
+    onMutate: () => {
+      setError(null)
+      setCreatedCode(null)
+    },
+    onSuccess: (result) => {
+      // 权益创建会同时生成占位内容，前端保存两个 id 以便继续生成兑换码或跳转复核。
+      setCreatedEntitlement(result)
+      setEntitlementId(result.entitlementId)
+      toast.success('权益与占位内容已创建')
+    },
+    onError: (err) => {
+      setError(toMessage(err))
+    },
+  })
 
-  const filteredApps = apps
-    .sort((a, b) =>
-      sort === 'asc'
-        ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name)
-    )
-    .filter((app) =>
-      appType === 'connected'
-        ? app.connected
-        : appType === 'notConnected'
-          ? !app.connected
-          : true
-    )
-    .filter((app) => app.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const redemptionCodeMutation = useMutation({
+    mutationFn: (input: { entitlementId: string; plainCode?: string }) =>
+      createRedemptionCode(input.entitlementId, input.plainCode),
+    onMutate: () => setError(null),
+    onSuccess: (result) => {
+      // plainCode 只会在服务端响应中出现一次，因此创建后立即显式展示，方便运营复制。
+      setCreatedCode(result)
+      setPlainCode('')
+      toast.success('兑换码已生成')
+    },
+    onError: (err) => setError(toMessage(err)),
+  })
 
-  const handleSearch = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value)
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        filter: e.target.value || undefined,
-      }),
-    })
+  const loading =
+    entitlementMutation.isPending || redemptionCodeMutation.isPending
+
+  function submitEntitlement(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    entitlementMutation.mutate(title.trim())
   }
 
-  const handleTypeChange = (value: AppType) => {
-    setAppType(value)
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        type: value === 'all' ? undefined : value,
-      }),
+  function submitRedemptionCode(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    redemptionCodeMutation.mutate({
+      entitlementId: entitlementId.trim(),
+      plainCode: plainCode.trim() || undefined,
     })
-  }
-
-  const handleSortChange = (sort: 'asc' | 'desc') => {
-    setSort(sort)
-    navigate({ search: (prev) => ({ ...prev, sort }) })
   }
 
   return (
     <>
-      {/* ===== Top Heading ===== */}
       <Header>
-        <Search className='me-auto' />
+        <div className='me-auto'>
+          <h1 className='text-lg font-semibold'>权益与兑换码</h1>
+        </div>
         <ThemeSwitch />
         <ConfigDrawer />
         <ProfileDropdown />
       </Header>
 
-      {/* ===== Content ===== */}
-      <Main fixed>
+      <Main className='space-y-6'>
         <div>
-          <h1 className='text-2xl font-bold tracking-tight'>
-            App Integrations
-          </h1>
+          <h2 className='text-2xl font-bold tracking-tight'>权益发放</h2>
           <p className='text-muted-foreground'>
-            Here&apos;s a list of your apps for the integration!
+            创建内容权益、占位内容，并为权益生成一次性兑换码。
           </p>
         </div>
-        <div className='my-4 flex items-end justify-between sm:my-0 sm:items-center'>
-          <div className='flex flex-col gap-4 sm:my-4 sm:flex-row'>
-            <Input
-              placeholder='Filter apps...'
-              className='h-9 w-40 lg:w-62.5'
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-            <Select value={appType} onValueChange={handleTypeChange}>
-              <SelectTrigger className='w-36'>
-                <SelectValue>{appText.get(appType)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>All Apps</SelectItem>
-                <SelectItem value='connected'>Connected</SelectItem>
-                <SelectItem value='notConnected'>Not Connected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
-          <Select value={sort} onValueChange={handleSortChange}>
-            <SelectTrigger className='w-16'>
-              <SelectValue>
-                <SlidersHorizontal size={18} />
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent align='end'>
-              <SelectItem value='asc'>
-                <div className='flex items-center gap-4'>
-                  <ArrowUpAZ size={16} />
-                  <span>Ascending</span>
+        {error ? (
+          <Alert variant='destructive'>
+            <AlertTitle>操作失败</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className='grid gap-4 lg:grid-cols-2'>
+          <Card>
+            <CardHeader>
+              <CardTitle>创建权益</CardTitle>
+              <CardDescription>
+                后端会在同一事务内创建 ContentEntitlement 与占位 Content。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className='space-y-4' onSubmit={submitEntitlement}>
+                <div className='space-y-2'>
+                  <Label htmlFor='entitlement-title'>占位标题</Label>
+                  <Input
+                    id='entitlement-title'
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder='例如：线下活动门票权益'
+                  />
                 </div>
-              </SelectItem>
-              <SelectItem value='desc'>
-                <div className='flex items-center gap-4'>
-                  <ArrowDownAZ size={16} />
-                  <span>Descending</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Separator className='shadow-sm' />
-        <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>
-          {filteredApps.map((app) => (
-            <li
-              key={app.name}
-              className='rounded-lg border p-4 hover:shadow-md'
-            >
-              <div className='mb-8 flex items-center justify-between'>
-                <div
-                  className={`flex size-10 items-center justify-center rounded-lg bg-muted p-2`}
-                >
-                  {app.logo}
-                </div>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  className={`${app.connected ? 'border border-blue-300 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900' : ''}`}
-                >
-                  {app.connected ? 'Connected' : 'Connect'}
+                <Button disabled={loading}>
+                  {loading ? <Loader2 className='animate-spin' /> : <Plus />}
+                  创建权益
                 </Button>
-              </div>
-              <div>
-                <h2 className='mb-1 font-semibold'>{app.name}</h2>
-                <p className='line-clamp-2 text-gray-500'>{app.desc}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>生成兑换码</CardTitle>
+              <CardDescription>
+                可使用刚创建的 entitlementId，也可粘贴已有权益 id。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className='space-y-4' onSubmit={submitRedemptionCode}>
+                <div className='space-y-2'>
+                  <Label htmlFor='entitlement-id'>entitlementId</Label>
+                  <Input
+                    id='entitlement-id'
+                    required
+                    value={entitlementId}
+                    onChange={(event) => setEntitlementId(event.target.value)}
+                    className='font-mono'
+                    placeholder='00000000-0000-4000-8000-000000000000'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='plain-code'>自定义明文码（可选）</Label>
+                  <Input
+                    id='plain-code'
+                    value={plainCode}
+                    onChange={(event) => setPlainCode(event.target.value)}
+                    placeholder='不填则由服务端随机生成'
+                  />
+                </div>
+                <Button disabled={loading}>
+                  {loading ? <Loader2 className='animate-spin' /> : <Ticket />}
+                  生成兑换码
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className='grid gap-4 lg:grid-cols-2'>
+          <ResultCard
+            title='最近创建的权益'
+            empty='创建权益后会显示 entitlementId 与 contentId。'
+            rows={
+              createdEntitlement
+                ? [
+                    ['entitlementId', createdEntitlement.entitlementId],
+                    ['contentId', createdEntitlement.contentId],
+                  ]
+                : []
+            }
+          />
+          <ResultCard
+            title='最近生成的兑换码'
+            empty='生成后请立即复制 plainCode，服务端不会再次返回明文。'
+            rows={
+              createdCode
+                ? [
+                    ['redemptionCodeId', createdCode.redemptionCodeId],
+                    ['plainCode', createdCode.plainCode],
+                  ]
+                : []
+            }
+          />
+        </div>
       </Main>
     </>
   )
+}
+
+function ResultCard({
+  title,
+  empty,
+  rows,
+}: {
+  title: string
+  empty: string
+  rows: Array<[string, string]>
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-3'>
+        {rows.length ? (
+          rows.map(([label, value]) => (
+            <div key={label} className='flex min-w-0 items-center gap-2'>
+              <div className='w-32 shrink-0 text-sm text-muted-foreground'>
+                {label}
+              </div>
+              <code className='min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs'>
+                {value}
+              </code>
+              <Button
+                variant='outline'
+                size='icon'
+                onClick={() => void copy(value)}
+                aria-label={`复制 ${label}`}
+              >
+                <Copy />
+              </Button>
+            </div>
+          ))
+        ) : (
+          <div className='rounded-lg border border-dashed p-6 text-sm text-muted-foreground'>
+            {empty}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+async function copy(value: string) {
+  await navigator.clipboard.writeText(value)
+  toast.success('已复制')
+}
+
+function toMessage(err: unknown): string {
+  if (err instanceof AdminApiError) {
+    return `${err.code}: ${err.message}`
+  }
+  return err instanceof Error ? err.message : String(err)
 }
