@@ -18,11 +18,9 @@ import {
   MessageSquareText,
   ShieldCheck,
   ClipboardList,
-  GalleryVerticalEnd,
   History,
   Newspaper,
   ShieldAlert,
-  Ticket,
   WandSparkles,
   Command,
 } from 'lucide-react'
