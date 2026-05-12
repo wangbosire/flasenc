@@ -27,7 +27,7 @@ async function main() {
   loadDotEnv(path.join(__dirname, '..', '.env'));
 
   const defaultUrl =
-    'mysql://root:root123..@127.0.0.1:3306/flasenc';
+    'mysql://root:root123..@127.0.0.1:3307/flasenc';
   process.env.DATABASE_URL ??= defaultUrl;
   const url = process.env.DATABASE_URL;
   if (!url) {

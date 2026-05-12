@@ -6,9 +6,9 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 
 const defaultMysqlUrl =
-  'mysql://root:root123..@127.0.0.1:3306/flasenc';
+  'mysql://root:root123..@127.0.0.1:3307/flasenc';
 
-// 本机口令与示例不一致时，在 apps/server/.env 设置 DATABASE_URL；本地标准路径不依赖 Docker。
+// 标准开发路径使用根目录 compose.yml；在容器内 compose 会注入 DATABASE_URL。
 // 将 migrations 应用到当前库；勿对含生产数据且未备份的库随意执行。
 const r = spawnSync(
   'pnpm',

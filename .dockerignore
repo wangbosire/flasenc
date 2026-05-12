@@ -1,0 +1,12 @@
+.git
+.turbo
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+apps/*/dist
+packages/*/dist
+coverage
+.DS_Store
+*.log
+apps/server/.env
+apps/server/.db-connection-test-result.txt

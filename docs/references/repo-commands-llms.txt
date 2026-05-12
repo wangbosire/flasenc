@@ -1,6 +1,15 @@
-# flasenc 仓库命令（pnpm 9 + turbo）
+# flasenc 仓库命令（Docker 标准开发环境 + pnpm 9 + turbo）
 
 在仓库根目录执行。包名见各应用 `package.json` 的 `name` 字段。
+
+## Docker（开发标准路径）
+
+pnpm docker:dev       # 构建并前台启动完整开发栈；应用容器名 flasenc
+pnpm docker:up        # 后台启动完整开发栈；MySQL 容器名 flasenc-mysql
+pnpm docker:logs      # 查看 flasenc 容器日志
+pnpm docker:shell     # 进入 flasenc 容器后执行 pnpm lint/check-types/build/test
+pnpm docker:down      # 停止容器，保留数据卷
+docker compose down -v # 清空 Docker MySQL 与依赖缓存卷（谨慎）
 
 ## 根目录（全仓 / turbo）
 
@@ -13,7 +22,7 @@ pnpm format           # Prettier（根脚本；范围见 package.json）
 
 ## 按应用过滤（推荐日常开发）
 
-# 管理后台 React + Vite + shadcn/ui（Node >= 20.19；本机可用 `fnm exec --using v22.20.0 ...`）
+# 管理后台 React + Vite + shadcn/ui（建议在 `pnpm docker:shell` 内执行）
 pnpm --filter @flasenc/admin-web dev
 pnpm --filter @flasenc/admin-web build
 pnpm --filter @flasenc/admin-web run check-types
@@ -26,9 +35,9 @@ pnpm --filter @flasenc/server build
 pnpm --filter @flasenc/server lint
 pnpm --filter @flasenc/server test
 pnpm --filter @flasenc/server run test:e2e
-# E2E 需本机 MySQL（库 flasenc，DATABASE_URL 见 apps/server/.env.example）；本地标准路径零 Docker 依赖
+# E2E / 开发数据库默认使用 Docker MySQL（容器 flasenc-mysql，库 flasenc）
 pnpm --filter @flasenc/server run check-types
-pnpm --filter @flasenc/server run db:test-connection   # 本机 MySQL 连通性（见 BACKEND §1.1）
+pnpm --filter @flasenc/server run db:test-connection   # MySQL 连通性（见 BACKEND §1.1）
 pnpm --filter @flasenc/server run db:migrate:deploy    # 空库 / 新环境应用已版本化迁移
 pnpm --filter @flasenc/server run db:seed:admin         # 本地管理账号 admin@example.com / admin123..
 

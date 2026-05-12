@@ -1,0 +1,17 @@
+FROM node:22.20-bookworm-slim
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV PNPM_STORE_DIR="/pnpm/store"
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+WORKDIR /workspace
+
+EXPOSE 3000 3001 5173
+
+CMD ["bash", "scripts/docker-dev.sh"]

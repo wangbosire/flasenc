@@ -1,9 +1,9 @@
 /**
- * 单测 / E2E 未显式设置 `DATABASE_URL` 时的本地默认（本机 MySQL，默认端口 3306）。
- * 本机 root 口令与示例不一致时，须在 `apps/server/.env` 中配置 `DATABASE_URL`；不依赖 Docker。
+ * 单测 / E2E 未显式设置 `DATABASE_URL` 时的本地默认（Docker MySQL 映射端口 3307）。
+ * 在 `flasenc` 容器内运行时，compose 会注入容器内连接串并覆盖该默认值。
  */
 process.env.DATABASE_URL ??=
-  'mysql://root:root123..@127.0.0.1:3306/flasenc';
+  'mysql://root:root123..@127.0.0.1:3307/flasenc';
 
 /** 与 `AuthModule` / E2E 一致；生产须覆盖为强随机密钥。 */
 process.env.JWT_SECRET ??=
